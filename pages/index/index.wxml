@@ -1,0 +1,17 @@
+<view class="container">
+	<camera frame-size="{{frameSize}}" device-position="front" class="cameraClass"></camera>
+	<canvas type="webgl" id="canvasId" canvas-id="canvasId" class="canvasClass" disable-scroll="true"></canvas>
+</view>
+<canvas id="OffscreenCanvas" class="OffscreenCanvas" type="2d" visibility="hidden" style="width:300px;height:300px;margin:0 auto;"></canvas>
+
+
+<!-- <camera device-position="front" flash="off" resolution="high" frame-size="small" binderror="error" style="width: 300px; height: 300px;margin:0 auto;" wx:hidden="{{true}}"></camera>
+<canvas id="OffscreenCanvas" class="OffscreenCanvas" type="2d" style="width:300px;height:300px;margin:0 auto;"></canvas>
+<button bindtap="getwasm">获取wasm</button>
+<button bindtap="getgray">灰度lena</button>
+<button bindtap="getcamera">捕获相机</button>
+<button bindtap="stop">停止捕获</button> -->
+
+
+<button bindtap="getwasm">获取wasm</button>
+<button bindtap="getgray">灰度lena</button>
