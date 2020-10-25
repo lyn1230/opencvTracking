@@ -5,7 +5,7 @@ var cv;
 var listener;
 
 let dev = {
-  ifStartListen: false
+  ifStartListen: true  
 };
 
 const cameraConfig = {
@@ -22,60 +22,48 @@ const performMonitor = {          //性能监视器
 };
 let camera, renderer, scene;   //three.js相关的三大要素
 
+const templateImage = {
+  originalDescriptorsArray: new Array(),
+  originalKeyPointsArray: new Array(),
+  originalFrameArray: new Array(),
+  image: []
+};
+
+const currentFrameSet = {    
+  currentFrame: null,
+  currentGray: null,
+  detector: null,
+  feature_size: 100,    //要跟踪的特征点的数量
+  keyPoints: null,      //特征点
+  descriptors: null,     //描述子
+  goodMatches: null,
+  matcher: null,
+  KNN_Matches: null
+};
+const nextFrameSet = {
+
+};
+
+//不知道放在哪里的变量
+const MatchRatio = 0.8;
+//不知道放在哪里的变量
+
+
+
 
 Page({
   data: {
     frameSize: "small"
   },
 
-   //生命周期函数--监听页面加载
-  onLoad: function (options) {
-    this.frameSizeInit();    //自动适配实时帧的宽高
-    this.getwasm();        //加载opencv.js，确保可以
-  },
-
-
    //生命周期函数--监听页面初次渲染完成
   onReady: function () {  
-    this.webglInit();                  //webgl初始化
+    this.frameSizeInit();    //自动适配实时帧的宽高
+    // this.webglInit();        //webgl初始化
+    this.getwasm();          //加载opencv.js，确保可以
   },
 
- 
-   //生命周期函数--监听页面显示
-  onShow: function () {
-
-  },
-
-  
-   //生命周期函数--监听页面隐藏   
-  onHide: function () {
-
-  },
-
-  
-   //生命周期函数--监听页面卸载   
-  onUnload: function () {
-
-  },
-
-   // 页面相关事件处理函数--监听用户下拉动作
-  onPullDownRefresh: function () {
-
-  },
-
-  
-   // 页面上拉触底事件的处理函数
-  onReachBottom: function () {
-
-  },
-
-  
-   // 用户点击右上角分享  
-  onShareAppMessage: function () {
-
-  },
-
-  //事件处理函数
+  //事件处理函数console.log();
   getwasm: function () {          //加载opencv.js,加载成功后开启监听器，进行帧处理
     let that = this;
     let wasmStart = Date.now();
@@ -87,7 +75,6 @@ Page({
       success: function (Module) {
         util.alert(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv=Module;
-        console.log(cv);
         that.main();
       }
     });
@@ -202,7 +189,8 @@ Page({
   },
   
   main: function(){
-    let that = this;
+    let that = this;   
+    this.varInit();    //变量初始化，防止变量太多造成程序结构混乱，将具有共性的变量统一起来
     let listener = wx.createCameraContext().onCameraFrame((res) => {      
       if (cameraConfig.flag === false)
         return;
@@ -210,8 +198,8 @@ Page({
       cameraConfig.flag = false;                             //立即停止下一帧的获取，等待当前帧处理后，再处理下一帧
       cameraConfig.frame.data = new Uint8Array(res.data);    //更新实时帧的图像数据
       that.handleFrame();                 //将摄像头图像放置到webgl背景中（后续添加图像算法处理）
-      // console.log(performMonitor.frameCount++);
-      console.log("run time:", (Date.now() - timeStart));
+      ++performMonitor.frameCount;
+      console.log("run time:", (Date.now() - timeStart), "ms");
       performMonitor.fps = 1000 / (Date.now() - timeStart);
       // console.log("FPS:", performMonitor.fps);
     });
@@ -219,42 +207,87 @@ Page({
       listener.start();
     }
   },
-  
-  async findNaturlImage() {
-    await this.findFeaturePoints();    //找到初始角点
-    await this.tracking();             //特征点跟踪
+
+  /*相关变量的定义*/
+  varInit: function(){
+    currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
+    currentFrameSet.currentGray = new cv.Mat();
+    currentFrameSet.detector = new cv.ORB(currentFrameSet.feature_size, 1.2, 1, 0);
+    currentFrameSet.keyPoints = new cv.KeyPointVector();
+    currentFrameSet.descriptors = new cv.Mat();
+    currentFrameSet.goodMatches = new cv.DMatchVector();
+    currentFrameSet.matcher = new cv.BFMatcher(cv.NORM_HAMMING, false);
+    currentFrameSet.KNN_Matches = new cv.DMatchVectorVector();
   },
 
-  findFeaturePoints: function(){
+  handleFrame() {
+    this.findNaturlImage();
+    //this.setBackImage();    //此处后续要添加3D模型的渲染
+    if(performMonitor.frameCount < 6)
+    cameraConfig.flag = true;    //每一帧图像处理完成，标志位更新，继续获取下一帧
+  },
 
+  async findNaturlImage() {
+    await this.tempHandle();           //处理模板图
+    await this.findFeaturePoints();    //找到初始角点
+    //await this.tracking();             //特征点跟踪
+  },
+
+  tempHandle: function(){
+    /*图像金字塔*/
+    // 不同尺度模板图片处理(得到特征点和描述子)
+    util.init_originalFrameInfo(templateImage.originalFrameArray, templateImage.originalKeyPointsArray, templateImage.originalDescriptorsArray,templateImage.image, 500, 500);
+
+
+
+        // 不同尺度模板图片顶点坐标
+        let newBB = new cv.Mat();
+        let oldBB = new cv.Mat();
+        let originBB = new cv.Mat();
+        let originalBBArray = new Array();  //此数组里面有4个Mat格式的数据
+        init_originalBB(originalBBArray);
+  },
+  
+  findFeaturePoints: function(){
+    console.log("开始寻找初始角点...");
+    let { currentFrame, currentGray, detector, feature_size, keyPoints, descriptors, KNN_Matches } = currentFrameSet;
+
+    currentFrame.data.set(cameraConfig.frame.data);    //摄像机图像的Mat格式
+    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY);  //灰度化    
+    detector.detect(currentGray, keyPoints);           //得到特征点keyPoints    
+    console.log("keyPoints:", keyPoints);
+    let actualNumber = keyPoints.size();
+    console.log("特征点识别数量：", actualNumber);
+    if(actualNumber < 0.5*feature_size){
+      console.log("info:keypoints is too few, return now...");
+      return;
+    }
+    detector.compute(currentGray, keyPoints, descriptors);
+    console.log("descriptors:", descriptors);     //得到描述子
+    currentFrameSet.matcher.knnMatch(descriptors, originalDescriptorsArray[i], KNN_Matches, 2);
+    // 筛选goodmatches良好匹配
+    for (let j = 0; j < KNN_Matches.size(); j++) {
+      if (KNN_Matches.get(j).size() < 2)  continue;
+      let m = KNN_Matches.get(j).get(0);
+      let n = KNN_Matches.get(j).get(1);
+      if (m.distance < MatchRatio * n.distance) {
+          goodMatches.push_back(m);
+      }
+  }
   },
   
   tracking: function(){
 
   },
 
-  setBackImage() {
-    let geometry = new THREE.PlaneGeometry(cameraConfig.frame.width, cameraConfig.frame.height); //矩形平面
-    let texture = new THREE.DataTexture(cameraConfig.frame.data, cameraConfig.frame.width, cameraConfig.frame.height, THREE.RGBAFormat);
 
-    //texture.needsUpdate = true; //纹理更新，作用存疑，似乎是正作用
-    let tex_material = new THREE.MeshPhongMaterial({
-      map: texture,         // 设置纹理贴图
-      side: THREE.DoubleSide
-    });
-    geometry.translate(cameraConfig.frame.width / 2, cameraConfig.frame.height / 2, 0);
-    geometry.rotateX(Math.PI);
-    let mesh = new THREE.Mesh(geometry, tex_material);
-    scene.add(mesh);
-    renderer.render(scene, camera);
-  },
 
-  handleFrame() {
-    this.findNaturlImage();
-    this.setBackImage();
+ 
 
-    cameraConfig.flag = true;    //每一帧图像处理完成，标志位更新，继续获取下一帧
-  },
+
+
+
+  /* webgl相关*/
   webglInit() {
     wx.createSelectorQuery().select('#canvasId')
       .node()
@@ -277,8 +310,26 @@ Page({
         let ambient = new THREE.AmbientLight(0xF5F5F5);
         scene = new THREE.Scene();
         scene.add(ambient);
+        console.log('完成webgl');
       });
   },
+  setBackImage() {
+    let geometry = new THREE.PlaneGeometry(cameraConfig.frame.width, cameraConfig.frame.height); //矩形平面
+    let texture = new THREE.DataTexture(cameraConfig.frame.data, cameraConfig.frame.width, cameraConfig.frame.height, THREE.RGBAFormat);
+
+    //texture.needsUpdate = true; //纹理更新，作用存疑，似乎是正作用
+    let tex_material = new THREE.MeshPhongMaterial({
+      map: texture,         // 设置纹理贴图
+      side: THREE.DoubleSide
+    });
+    geometry.translate(cameraConfig.frame.width / 2, cameraConfig.frame.height / 2, 0);
+    geometry.rotateX(Math.PI);
+    let mesh = new THREE.Mesh(geometry, tex_material);
+    scene.add(mesh);
+    renderer.render(scene, camera);
+  },
+
+  /*图像帧尺寸自适应*/
   frameSizeInit() {
     if (this.data.frameSize === "small") {
       cameraConfig.frame.width = 288;

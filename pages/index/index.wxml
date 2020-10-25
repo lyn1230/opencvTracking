@@ -1,8 +1,8 @@
 <view class="container">
 	<camera frame-size="{{frameSize}}" device-position="front" class="cameraClass"></camera>
-	<canvas type="webgl" id="canvasId" canvas-id="canvasId" class="canvasClass" disable-scroll="true"></canvas>
+	<!-- <canvas type="webgl" id="canvasId" canvas-id="canvasId" class="canvasClass" disable-scroll="true"></canvas> -->
 </view>
-<canvas id="OffscreenCanvas" class="OffscreenCanvas" type="2d" visibility="hidden" style="width:300px;height:300px;margin:0 auto;"></canvas>
+<canvas id="OffscreenCanvas" type="2d" class="canvasClass" disable-scroll="true"></canvas>
 
 
 <!-- <camera device-position="front" flash="off" resolution="high" frame-size="small" binderror="error" style="width: 300px; height: 300px;margin:0 auto;" wx:hidden="{{true}}"></camera>
