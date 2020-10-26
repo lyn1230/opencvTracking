@@ -6,7 +6,7 @@ let showToast = function (description, duration = 1500, icon = 'success') {
   })
 };
 
-let initOriginalFrameInfo = function (originalFrameArray, originalKeyPointsArray, originalDescriptorsArray, imageArray, width, height) {
+let initOriginalFrameInfo = function (originalFrameArray, originalKeyPointsArray, originalDescriptorsArray, imageArray, width, height, cv, detector) {
   let originalFrame1 = new cv.Mat(height, width, cv.CV_8UC4);
   let originalFrame2 = new cv.Mat(height, width, cv.CV_8UC4);
   let originalFrame3 = new cv.Mat(height, width, cv.CV_8UC4);
@@ -25,9 +25,10 @@ let initOriginalFrameInfo = function (originalFrameArray, originalKeyPointsArray
 
   cv.imread(imageArray[0], function (mat) {
     originalFrame1 = mat;
-    let originalGray = new cv.Mat();
+    let originalGray = new cv.Mat();    
     cv.cvtColor(originalFrame1, originalGray, cv.COLOR_RGB2GRAY); // 进行灰度化  
     detector.detect(originalGray, originalKeyPoints1);
+    console.log(originalKeyPoints1);
     detector.compute(originalGray, originalKeyPoints1, originalDescriptors1);
   });
 
