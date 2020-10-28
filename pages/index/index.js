@@ -35,6 +35,7 @@ const templateImage = {
     "https://www.wechatvr.org/imageTemplate/school_2.jpg",
     "https://www.wechatvr.org/imageTemplate/school_3.jpg",
   ],
+  tempImage_id: -1
 };
 let dev = {
   ifStartListen: true,
@@ -69,7 +70,7 @@ Page({
   },
 
   //生命周期函数--监听页面初次渲染完成
-  onReady: function () {
+  onReady: async function () {
     this.frameSizeInit(); //自动适配实时帧的宽高
     // this.webglInit();        //webgl初始化
     this.getwasm(); //加载opencv.js，确保可以
@@ -200,9 +201,11 @@ Page({
     listener.stop();
   },
 
-  main: function () {
+  main: async function () {
     let that = this;
     this.varInit(); //变量初始化，防止变量太多造成程序结构混乱，将具有共性的变量统一起来
+    await this.tempHandle(); //处理模板图
+
     let listener = wx.createCameraContext().onCameraFrame((res) => {
       if (cameraConfig.flag === false)
         return;
@@ -240,16 +243,14 @@ Page({
   },
 
   findNaturlImage() {
-    this.tempHandle(); //处理模板图
     this.findFeaturePoints(); //找到初始角点
     //await this.tracking();             //特征点跟踪
   },
 
-  tempHandle: function () {
+  tempHandle: async function () {
     /*图像金字塔*/
     // 不同尺度模板图片处理(得到特征点和描述子)
-    util.init_originalFrameInfo(templateImage.originalFrameArray, templateImage.originalKeyPointsArray, templateImage.originalDescriptorsArray, dev.image, 500, 500, cv, currentFrameSet.detector);
-
+    await util.init_originalFrameInfo(templateImage.originalFrameArray, templateImage.originalKeyPointsArray, templateImage.originalDescriptorsArray, dev.image, 500, 500, cv, currentFrameSet.detector);
 
     // // 不同尺度模板图片顶点坐标
     // let newBB = new cv.Mat();
@@ -261,6 +262,7 @@ Page({
 
   findFeaturePoints: function () {
     console.log("开始寻找初始角点...");
+    //解构赋值
     let {
       currentFrame,
       currentGray,
@@ -268,36 +270,57 @@ Page({
       feature_size,
       keyPoints,
       descriptors,
-      KNN_Matches
+      KNN_Matches,
+      matcher,
+      goodMatches
     } = currentFrameSet;
 
     let {
       originalDescriptorsArray
     } = templateImage;
 
+
+
+    //得到实时帧的特征点和描述子
     currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
     cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
     detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
-    console.log("keyPoints:", keyPoints);
     let actualNumber = keyPoints.size();
     console.log("特征点识别数量：", actualNumber);
     if (actualNumber < 0.5 * feature_size) {
       console.log("info:keypoints is too few, return now...");
       return;
     }
-    detector.compute(currentGray, keyPoints, descriptors);
-    console.log("descriptors:", descriptors); //得到描述子
-    currentFrameSet.matcher.knnMatch(descriptors, originalDescriptorsArray[0], KNN_Matches, 2);
-    console.log("@@@@@", KNN_Matches.size());
+    detector.compute(currentGray, keyPoints, descriptors); //得到描述子
+
+
+
+
     // 筛选goodmatches良好匹配
-    for (let j = 0; j < KNN_Matches.size(); j++) {
-      if (KNN_Matches.get(j).size() < 2) continue;
-      let m = KNN_Matches.get(j).get(0);
-      let n = KNN_Matches.get(j).get(1);
-      if (m.distance < MatchRatio * n.distance) {
-        goodMatches.push_back(m);
+    for (let i = 0; i < 3; i++) {
+      console.log(`马上与第${i+1}张模板图进行匹配...`);
+      matcher.knnMatch(descriptors, originalDescriptorsArray[i], KNN_Matches, 2);
+      // 筛选goodmatches良好匹配
+      console.log(`找到了${KNN_Matches.size()}个匹配点对`);
+      for (let j = 0; j < KNN_Matches.size(); j++) {
+        if (KNN_Matches.get(j).size() < 2) continue;
+        let m = KNN_Matches.get(j).get(0);
+        let n = KNN_Matches.get(j).get(1);
+        if (m.distance < MatchRatio * n.distance) {
+          goodMatches.push_back(m);
+        }
       }
+      if (goodMatches.size() > 20) {
+        templateImage.tempImage_id = i;
+        break;
+      } else {
+        goodMatches = new cv.DMatchVector();
+      }
+      KNN_Matches.delete();
     }
+
+    console.log("模板图id：", templateImage.tempImage_id);
+    debugger;
   },
 
   tracking: function () {

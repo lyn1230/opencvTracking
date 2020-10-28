@@ -6508,22 +6508,23 @@ if (Module["preInit"]) {
 noExitRuntime = true;
 
 
-Module["imread"] = function (imageSource, callback) {
-
-    var cv = Module;
-    var canvas=Module["canvas"];
-    var ctx =Module["canvascontext"];
-    var img = canvas.createImage();
-    img.src = imageSource;
-    img.onload = function () {
-        ctx.drawImage(img, 0, 0, img.width, img.height)
-        var imgData = ctx.getImageData(0, 0, canvas.width, canvas.width);
-        callback(cv.matFromImageData(imgData));
-
-    }
-    img.onerror=function(evt){
-        console.log(evt);
-    }
+Module["imread"] = function (imageSource) {
+    return new Promise((resolve)=>{
+        var cv = Module;
+        var canvas=Module["canvas"];
+        var ctx =Module["canvascontext"];
+        var img = canvas.createImage();
+        img.src = imageSource;
+    
+        img.onload = function () {            
+            ctx.drawImage(img, 0, 0, img.width, img.height)
+            var imgData = ctx.getImageData(0, 0, canvas.width, canvas.width);
+            resolve(cv.matFromImageData(imgData));            
+        }
+        img.onerror=function(evt){
+            console.log(evt);
+        }
+    });
 };
 Module["imshowed"]=false;
 Module["imshow"] = function (mat) {
