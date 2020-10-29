@@ -72,6 +72,7 @@ let initOriginalFrameInfo = async function (originalFrameArray, originalKeyPoint
   originalDescriptorsArray[2] = originalDescriptors3;
   originalDescriptorsArray[3] = originalDescriptors4;
 
+  console.log(originalDescriptorsArray[3]);
   console.log("模板图描述子提取结束...");
 };
 

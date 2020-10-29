@@ -6823,6 +6823,7 @@ function init(args) {
                 Module["canvas"] = res.node;
                 var dpr=wx.getSystemInfoSync().pixelRatio;
                 Module["canvas"].width=res.node._width*dpr;
+                
                 Module["canvas"].height=res.node._height*dpr;
                 Module["canvascontext"]=Module["canvas"].getContext("2d");
                 Module["canvascontext"].scale(dpr,dpr);
