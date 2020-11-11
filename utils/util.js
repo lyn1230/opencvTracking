@@ -76,8 +76,56 @@ let initOriginalFrameInfo = async function (originalFrameArray, originalKeyPoint
   console.log("模板图描述子提取结束...");
 };
 
+let initOriginalBB = function(vertexArray, cv) {
+  let originalBB0 = new cv.Mat(4, 1, cv.CV_32FC2);
+  originalBB0.data32F[0] = 0;
+  originalBB0.data32F[1] = 0;
+  originalBB0.data32F[2] = 250;
+  originalBB0.data32F[3] = 0;
+  originalBB0.data32F[4] = 250;
+  originalBB0.data32F[5] = 250;
+  originalBB0.data32F[6] = 0;
+  originalBB0.data32F[7] = 250;
+
+  let originalBB1 = new cv.Mat(4, 1, cv.CV_32FC2);
+  originalBB1.data32F[0] = 0;
+  originalBB1.data32F[1] = 0;
+  originalBB1.data32F[2] = 200;
+  originalBB1.data32F[3] = 0;
+  originalBB1.data32F[4] = 200;
+  originalBB1.data32F[5] = 200;
+  originalBB1.data32F[6] = 0;
+  originalBB1.data32F[7] = 200;
+
+  let originalBB2 = new cv.Mat(4, 1, cv.CV_32FC2);
+  originalBB2.data32F[0] = 0;
+  originalBB2.data32F[1] = 0;
+  originalBB2.data32F[2] = 170;
+  originalBB2.data32F[3] = 0;
+  originalBB2.data32F[4] = 170;
+  originalBB2.data32F[5] = 170;
+  originalBB2.data32F[6] = 0;
+  originalBB2.data32F[7] = 170;
+
+  let originalBB3 = new cv.Mat(4, 1, cv.CV_32FC2);
+  originalBB3.data32F[0] = 0;
+  originalBB3.data32F[1] = 0;
+  originalBB3.data32F[2] = 170;
+  originalBB3.data32F[3] = 0;
+  originalBB3.data32F[4] = 170;
+  originalBB3.data32F[5] = 170;
+  originalBB3.data32F[6] = 0;
+  originalBB3.data32F[7] = 170;
+
+  vertexArray[0] = originalBB0;
+  vertexArray[1] = originalBB1;
+  vertexArray[2] = originalBB2;
+  vertexArray[3] = originalBB3;
+};
+
 
 module.exports = {
-  alert: showToast,
-  init_originalFrameInfo: initOriginalFrameInfo
+  alertMini: showToast,
+  init_originalFrameInfo: initOriginalFrameInfo,
+  init_originalBB: initOriginalBB
 };

@@ -1,6 +1,6 @@
 const THREE = require("../../utils/three.min.js");
 const wasm = require("../../utils/wasm");
-const util = require("../../utils/util");
+const { alertMini, init_originalFrameInfo, init_originalBB } = require("../../utils/util");
 var cv;
 var listener;
 
@@ -35,7 +35,8 @@ const templateImage = {
     "https://www.wechatvr.org/imageTemplate/school_2.jpg",
     "https://www.wechatvr.org/imageTemplate/school_3.jpg",
   ],
-  tempImage_id: -1
+  tempImage_id: -1,
+  vertexArray: new Array()
 };
 let dev = {
   ifStartListen: true,   //是否开启监听器
@@ -89,7 +90,7 @@ Page({
       useCache: true, //是否使用缓存
       self: this,
       success: function (Module) {
-        util.alert(`耗时${(Date.now()-wasmStart)/1000}秒`);
+        alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
         that.main();
       }
@@ -251,10 +252,13 @@ Page({
   },
 
   tempHandle: async function () {
+    let { originalFrameArray, originalKeyPointsArray, originalDescriptorsArray, vertexArray } = templateImage;
     /*图像金字塔*/
     // 不同尺度模板图片处理(得到特征点和描述子)
-    await util.init_originalFrameInfo(templateImage.originalFrameArray, templateImage.originalKeyPointsArray, templateImage.originalDescriptorsArray, dev.image, 500, 500, cv, currentFrameSet.detector);
-
+    await init_originalFrameInfo(originalFrameArray, originalKeyPointsArray, originalDescriptorsArray, dev.image, 500, 500, cv, currentFrameSet.detector);
+    init_originalBB(vertexArray, cv);
+    console.log(vertexArray);
+    debugger;
     // // 不同尺度模板图片顶点坐标
     // let newBB = new cv.Mat();
     // let oldBB = new cv.Mat();
