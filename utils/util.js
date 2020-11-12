@@ -123,9 +123,38 @@ let initOriginalBB = function(vertexArray, cv) {
   vertexArray[3] = originalBB3;
 };
 
+// 画出识别图四周框
+let drawBoundingBox = function(img, bb, cv) {
+    cv.line(
+      img,
+      {x: bb.data32F[0], y: bb.data32F[1]},
+      {x: bb.data32F[2], y: bb.data32F[3]},
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img,
+      {x: bb.data32F[2], y: bb.data32F[3]},
+      {x: bb.data32F[4], y: bb.data32F[5]},
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img,
+      {x: bb.data32F[4], y: bb.data32F[5]},
+      {x: bb.data32F[6], y: bb.data32F[7]},
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img,
+      {x: bb.data32F[6], y: bb.data32F[7]},
+      {x: bb.data32F[0], y: bb.data32F[1]},
+      [255, 0, 0, 255],
+      3);
+};
+
 
 module.exports = {
   alertMini: showToast,
   init_originalFrameInfo: initOriginalFrameInfo,
-  init_originalBB: initOriginalBB
+  init_originalBB: initOriginalBB,
+  draw_bounding_box: drawBoundingBox
 };

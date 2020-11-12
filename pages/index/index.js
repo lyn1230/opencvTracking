@@ -1,6 +1,6 @@
 const THREE = require("../../utils/three.min.js");
 const wasm = require("../../utils/wasm");
-const { alertMini, init_originalFrameInfo, init_originalBB } = require("../../utils/util");
+const { alertMini, init_originalFrameInfo, init_originalBB, draw_bounding_box } = require("../../utils/util");
 var cv;
 var listener;
 
@@ -12,6 +12,8 @@ const cameraConfig = {
     width: 0,
     height: 0
   },
+  newVertex: null,
+  oldVertex: null
 };
 const performMonitor = { //性能监视器
   fps: 0, //帧率
@@ -24,8 +26,8 @@ const templateImage = {
   originalKeyPointsArray: new Array(),
   originalFrameArray: new Array(),
   imageTem: [
-    "https://www.wechatvr.org/imageTemplate/template_0.jpg",
     "https://www.wechatvr.org/imageTemplate/template_1.jpg",
+    "https://www.wechatvr.org/imageTemplate/template_0.jpg",
     "https://www.wechatvr.org/imageTemplate/template_2.jpg",
     "https://www.wechatvr.org/imageTemplate/template_3.jpg",
   ],
@@ -41,7 +43,7 @@ const templateImage = {
 let dev = {
   ifStartListen: true,   //是否开启监听器
   image: templateImage.imageTem,      //模板图是校园卡还是原来庄哥的图
-  frameCount: 6      //识别几帧之后停止下一帧的获取
+  frameCount: 10000000      //识别几帧之后停止下一帧的获取
 };
 
 const currentFrameSet = {
@@ -62,7 +64,28 @@ const nextFrameSet = {
 
 
 //不知道放在哪里的变量
-const MatchRatio = 0.8;
+const MatchRatio = 0.8;   //应用比例测试
+
+let p0 = null;     //ORB
+let [maxCorners, qualityLevel, minDistance, blockSize] = [60, 0.3, 6, 5];
+
+//L-K相关：
+let LK_pointOld = null;
+let LK_pointOrigin = null;
+let originLKPointSize = 0; // 特征匹配成功后lk光流所需追踪的特征点数量
+let oldGray = null;
+let flag_BB = 0;
+let temp_4BBArray = [];
+let smoothBBArray = new Array();
+
+
+//kalaman滤波初始化
+let nStates = 18;            // the number of states
+let nMeasurements = 6;       // the number of measured states
+let nInputs = 0;             // the number of control actions
+let dt = 0.125;           // time between measurements (1/FPS)
+let KF = null;   // instantiate Kalman Filter
+
 //不知道放在哪里的变量
 
 
@@ -96,16 +119,7 @@ Page({
       }
     });
   },
-  getgray: function () {
-    cv.imread("http://www.aiotforest.com/lena.png", function (mat) {
-      let src = mat;
-      let dstx = new cv.Mat();
-      cv.cvtColor(src, src, cv.COLOR_RGB2GRAY, 0);
-      cv.imshow(src);
-      src.delete();
-      dstx.delete();
-    });
-  },
+
   getcamera: function () {
     var self = this;
     if (!this.facexmlflag) {
@@ -207,7 +221,7 @@ Page({
 
   main: async function () {
     let that = this;
-    this.varInit(); //变量初始化，防止变量太多造成程序结构混乱，将具有共性的变量统一起来
+    this.varInit(); //变量初始化
     await this.tempHandle(); //处理模板图
 
     let listener = wx.createCameraContext().onCameraFrame((res) => {
@@ -218,7 +232,7 @@ Page({
       cameraConfig.frame.data = new Uint8Array(res.data); //更新实时帧的图像数据
       that.handleFrame(); //将摄像头图像放置到webgl背景中（后续添加图像算法处理）
       ++performMonitor.frameCount;
-      console.log("run time:", (Date.now() - timeStart), "ms");
+      // console.log("run time:", (Date.now() - timeStart), "ms");
       performMonitor.fps = 1000 / (Date.now() - timeStart);
       // console.log("FPS:", performMonitor.fps);
     });
@@ -227,7 +241,7 @@ Page({
     }
   },
 
-  /*相关变量的定义*/
+  /*需要用到cv的相关变量的定义*/
   varInit: function () {
     currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
     currentFrameSet.currentGray = new cv.Mat();
@@ -237,6 +251,14 @@ Page({
     currentFrameSet.goodMatches = new cv.DMatchVector();
     currentFrameSet.matcher = new cv.BFMatcher(cv.NORM_HAMMING, false);
     currentFrameSet.KNN_Matches = new cv.DMatchVectorVector();
+    cameraConfig.newVertex = new cv.Mat();
+    cameraConfig.oldVertex = new cv.Mat();
+
+    //不知道放在哪里的变量
+    LK_pointOld = new cv.Mat();
+    LK_pointOrigin = new cv.Mat();
+    oldGray = new cv.Mat();
+    KF = new cv.Mat();
   },
 
   handleFrame() {
@@ -254,21 +276,13 @@ Page({
   tempHandle: async function () {
     let { originalFrameArray, originalKeyPointsArray, originalDescriptorsArray, vertexArray } = templateImage;
     /*图像金字塔*/
-    // 不同尺度模板图片处理(得到特征点和描述子)
+    // 不同尺度模板图片处理(得到特征点、描述子、Mat格式的顶点坐标)
     await init_originalFrameInfo(originalFrameArray, originalKeyPointsArray, originalDescriptorsArray, dev.image, 500, 500, cv, currentFrameSet.detector);
     init_originalBB(vertexArray, cv);
-    console.log(vertexArray);
-    debugger;
-    // // 不同尺度模板图片顶点坐标
-    // let newBB = new cv.Mat();
-    // let oldBB = new cv.Mat();
-    // let originBB = new cv.Mat();
-    // let originalBBArray = new Array(); //此数组里面有4个Mat格式的数据
-    // init_originalBB(originalBBArray);
   },
 
   findFeaturePoints: function () {
-    console.log("开始寻找初始角点...");
+    // console.log("开始寻找初始角点...");
     //解构赋值
     let {
       currentFrame,
@@ -276,23 +290,28 @@ Page({
       detector,
       feature_size,
       keyPoints,
-      descriptors,
-      KNN_Matches,
-      matcher,
-      goodMatches
+      descriptors,      
+      matcher      
     } = currentFrameSet;
 
     let {
-      originalDescriptorsArray
+      originalKeyPointsArray,
+      originalDescriptorsArray,
+      vertexArray,
+      tempImage_id
     } = templateImage;
 
+    let {
+      newVertex,
+      oldVertex,
+    } = cameraConfig;
 
 
     //得到实时帧的特征点和描述子
     currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
     cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
     cv.imshow(currentGray);
-    if(0){
+    if(1){
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
       let actualNumber = keyPoints.size();
       console.log("特征点识别数量：", actualNumber);
@@ -305,8 +324,10 @@ Page({
   
   
       // 筛选goodmatches良好匹配
+      goodMatches = new cv.DMatchVector();
       for (let i = 0; i < 3; i++) {
         console.log(`马上与第${i+1}张模板图进行匹配...`);
+        KNN_Matches = new cv.DMatchVectorVector();
         matcher.knnMatch(descriptors, originalDescriptorsArray[i], KNN_Matches, 2);
         // 筛选goodmatches良好匹配
         console.log(`找到了${KNN_Matches.size()}个匹配点对`);
@@ -322,14 +343,14 @@ Page({
         }
         console.log("良好的点对个数：", goodMatches.size());
         if (goodMatches.size() > 20) {
-          templateImage.tempImage_id = i;
+          tempImage_id = i;
           break;
         } else {
           goodMatches = new cv.DMatchVector();
         }
         KNN_Matches.delete();
       }
-      console.log("模板图id：", templateImage.tempImage_id);
+      console.log("模板图id：", tempImage_id);
   
   
       // 当goodMathc成功匹配数小于所设阈值时，提前结束
@@ -341,11 +362,11 @@ Page({
       let matched1 = new cv.Mat(goodMatches.size(), 1, cv.CV_32FC2);
       let matched2 = new cv.Mat(goodMatches.size(), 1, cv.CV_32FC2);
       for (let i = 0; i < goodMatches.size(); i++) {
-        matched1.data32F[2 * i] = Math.round(originalKeyPointsArray[flag_index].get(goodMatches.get(i).trainIdx).pt.x);
-        matched1.data32F[2 * i + 1] = Math.round(originalKeyPointsArray[flag_index].get(goodMatches.get(i).trainIdx).pt.y);
+        matched1.data32F[2 * i] = Math.round(originalKeyPointsArray[tempImage_id].get(goodMatches.get(i).trainIdx).pt.x);
+        matched1.data32F[2 * i + 1] = Math.round(originalKeyPointsArray[tempImage_id].get(goodMatches.get(i).trainIdx).pt.y);
   
-        matched2.data32F[2 * i] = Math.round(newKeyPoints.get(goodMatches.get(i).queryIdx).pt.x);
-        matched2.data32F[2 * i + 1] = Math.round(newKeyPoints.get(goodMatches.get(i).queryIdx).pt.y);
+        matched2.data32F[2 * i] = Math.round(keyPoints.get(goodMatches.get(i).queryIdx).pt.x);
+        matched2.data32F[2 * i + 1] = Math.round(keyPoints.get(goodMatches.get(i).queryIdx).pt.y);
       }
   //  console.log("goodMatches:", goodMatches.size());
   
@@ -373,70 +394,69 @@ Page({
   
                       console.log("特征匹配单应矩阵内点数量：", inlierSize);
   
-                      // 对坐标点进行投射变换,利用单应性矩阵,将原始四顶点objectBB得到新的对应四顶点newBB
-                      cv.perspectiveTransform(originalBBArray[flag_index], newBB, homography);
+                      // 对坐标点进行投射变换,利用单应性矩阵,将原始四顶点objectBB得到新的对应四顶点newVertex
+                      cv.perspectiveTransform(vertexArray[tempImage_id], newVertex, homography);
   
                       // 判断识别区域是否大致符合四边形
-                      if (rectangle(newBB)){
-                          oldBB = newBB;
-                          originBB = newBB;
-                          drawBoundingBox(newFrame, newBB);  // 画出识别区域四周边框
+                      if (rectangle(newVertex)){
+                          oldVertex = newVertex;                          
+                          draw_bounding_box(currentFrame, newVertex);  // 画出识别区域四周边框
   
   
-                          //利用goodFeaturesToTrack去提取识别区域角点信息
-                          let mask_track = new cv.Mat.zeros(500,500,cv.CV_8UC1);
-                          let square_point_data = new Uint16Array([
-                              newBB.data32F[0], newBB.data32F[1],
-                              newBB.data32F[2], newBB.data32F[3],
-                              newBB.data32F[4], newBB.data32F[5],
-                              newBB.data32F[6], newBB.data32F[7]]);
-                          let square_points = cv.matFromArray(4, 1, cv.CV_32SC2, square_point_data);
-                          cv.fillConvexPoly(mask_track,square_points,new cv.Scalar(255));
-                          cv.goodFeaturesToTrack(newGray, p0, maxCorners, qualityLevel, minDistance, mask_track, blockSize);
-                          console.log("goodfeature:",p0.size().height);
-                          if(p0.size().height<0){
-                              cv.imshow("outputCanvas", newFrame);
-                              return
-                          }
+  //                         //利用goodFeaturesToTrack去提取识别区域角点信息
+  //                         let mask_track = new cv.Mat.zeros(500,500,cv.CV_8UC1);
+  //                         let square_point_data = new Uint16Array([
+  //                           newVertex.data32F[0], newVertex.data32F[1],
+  //                           newVertex.data32F[2], newVertex.data32F[3],
+  //                           newVertex.data32F[4], newVertex.data32F[5],
+  //                           newVertex.data32F[6], newVertex.data32F[7]]);
+  //                         let square_points = cv.matFromArray(4, 1, cv.CV_32SC2, square_point_data);
+  //                         cv.fillConvexPoly(mask_track,square_points,new cv.Scalar(255));
+  //                         cv.goodFeaturesToTrack(currentGray, p0, maxCorners, qualityLevel, minDistance, mask_track, blockSize);
+  //                         console.log("goodfeature:",p0.size().height);
+  //                         if(p0.size().height<0){
+  //                             cv.imshow("outputCanvas", currentFrame);
+  //                             return
+  //                         }
   
-                          // 更新光流追踪点
-                          LK_pointOld = new cv.Mat(p0.size().height, 1, cv.CV_32FC2);
-                          LK_pointOrigin = new cv.Mat(inlierSize, 1, cv.CV_32FC2);
-                          for (let i = 0; i < p0.size().height; i++) {
-  //                            cv.circle(newFrame, { x: p0.data32F[i * 2], y: p0.data32F[i * 2 + 1]}, 3, color[i],-1);
+  //                         // 更新光流追踪点
+  //                         LK_pointOld = new cv.Mat(p0.size().height, 1, cv.CV_32FC2);
+  //                         LK_pointOrigin = new cv.Mat(inlierSize, 1, cv.CV_32FC2);
+  //                         for (let i = 0; i < p0.size().height; i++) {
+  // //                            cv.circle(newFrame, { x: p0.data32F[i * 2], y: p0.data32F[i * 2 + 1]}, 3, color[i],-1);
   
-                              LK_pointOld.data32F[i * 2] = p0.data32F[i * 2];
-                              LK_pointOld.data32F[i * 2 + 1] = p0.data32F[i * 2 + 1];
+  //                             LK_pointOld.data32F[i * 2] = p0.data32F[i * 2];
+  //                             LK_pointOld.data32F[i * 2 + 1] = p0.data32F[i * 2 + 1];
   
-                              /*LK_pointOrigin.data32F[i * 2] = p0.data32F[i * 2];
-                              LK_pointOrigin.data32F[i * 2 + 1] = p0.data32F[i * 2 + 1];*/
-                          }
+  //                             /*LK_pointOrigin.data32F[i * 2] = p0.data32F[i * 2];
+  //                             LK_pointOrigin.data32F[i * 2 + 1] = p0.data32F[i * 2 + 1];*/
+  //                         }
   
   
   
-                          newGray.copyTo(oldGray);
-                          originLKPointSize = inlierSize; //更新lk光流初始追踪特征的数量
-                          flag_track = 1; // 开启光流追踪标志
-                          flag_BB= 0; // 标志位：捕捉四组识别区域顶点坐标
-                          temp_4BBArray = []; // 重新捕捉四组识别区域顶点坐标
+  //                         currentGray.copyTo(oldGray);
+  //                         originLKPointSize = inlierSize; //更新lk光流初始追踪特征的数量
+  //                         //flag_track = 1; // 开启光流追踪标志
+  //                         flag_BB= 0; // 标志位：捕捉四组识别区域顶点坐标
+  //                         temp_4BBArray = []; // 重新捕捉四组识别区域顶点坐标
   
-                          KF = new cv.KalmanFilter(nStates, nMeasurements, nInputs, cv.CV_64F);   // instantiate Kalman Filter
-                          initKalmanFilter(KF, nStates, nMeasurements, nInputs, dt);
-                          //更新光流追踪轨迹
-                          mask = new cv.Mat(video.height, video.width, cv.CV_8UC4, new cv.Scalar(0, 0, 0, 255));
+  //                         KF = new cv.KalmanFilter(nStates, nMeasurements, nInputs, cv.CV_64F);   // instantiate Kalman Filter
+  //                         //initKalmanFilter(KF, nStates, nMeasurements, nInputs, dt);
+  //                         //更新光流追踪轨迹
+  //                         //mask = new cv.Mat(video.height, video.width, cv.CV_8UC4, new cv.Scalar(0, 0, 0, 255));
   
-                          // 保证姿态估计按照默认原始最佳方案
-                          let marker_corner = [
-                              {'x': newBB.data32F[0], 'y': newBB.data32F[1]}, {
-                                  'x': newBB.data32F[2], 'y': newBB.data32F[3]
-                              }, {
-                                  'x': newBB.data32F[4], 'y': newBB.data32F[5]
-                              }, {
-                                  'x': newBB.data32F[6], 'y': newBB.data32F[7]
-                              }];
+  //                         // 保证姿态估计按照默认原始最佳方案
+  //                         let marker_corner = [
+  //                             {'x': newVertex.data32F[0], 'y': newVertex.data32F[1]}, {
+  //                                 'x': newVertex.data32F[2], 'y': newVertex.data32F[3]
+  //                             }, {
+  //                                 'x': newVertex.data32F[4], 'y': newVertex.data32F[5]
+  //                             }, {
+  //                                 'x': newVertex.data32F[6], 'y': newVertex.data32F[7]
+  //                             }];
   
-                          var temp_pose = pose_estimate(marker_corner);
-                          originalRotation = rot2euler(temp_pose.rotation1);
+  //                         var temp_pose = pose_estimate(marker_corner);
+  //                         originalRotation = rot2euler(temp_pose.rotation1);
                       }
   
                   }
