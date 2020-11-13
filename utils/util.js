@@ -151,10 +151,24 @@ let drawBoundingBox = function(img, bb, cv) {
       3);
 };
 
+let judgeRectangle = function(newBB){
+  let a,b,c,d=0
+  a = Math.sqrt((newBB.data32F[0]-newBB.data32F[2])*(newBB.data32F[0]-newBB.data32F[2]) + (newBB.data32F[1]-newBB.data32F[3])*(newBB.data32F[1]-newBB.data32F[3]));
+  b = Math.sqrt((newBB.data32F[2]-newBB.data32F[4])*(newBB.data32F[2]-newBB.data32F[4]) + (newBB.data32F[3]-newBB.data32F[5])*(newBB.data32F[3]-newBB.data32F[5]));
+  c = Math.sqrt((newBB.data32F[4]-newBB.data32F[6])*(newBB.data32F[4]-newBB.data32F[6]) + (newBB.data32F[5]-newBB.data32F[7])*(newBB.data32F[5]-newBB.data32F[7]));
+  d = Math.sqrt((newBB.data32F[6]-newBB.data32F[0])*(newBB.data32F[6]-newBB.data32F[0]) + (newBB.data32F[7]-newBB.data32F[1])*(newBB.data32F[7]-newBB.data32F[1]));
+  if (a/c>1.1 || c/a>1.1 || b/d>1.1 || d/b>1.1){
+      return 0;
+  }else{
+      return 1;
+  }
+}
+
 
 module.exports = {
   alertMini: showToast,
   init_originalFrameInfo: initOriginalFrameInfo,
   init_originalBB: initOriginalBB,
-  draw_bounding_box: drawBoundingBox
+  draw_bounding_box: drawBoundingBox,
+  rectangle: judgeRectangle
 };

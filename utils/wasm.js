@@ -6515,11 +6515,11 @@ Module["imread"] = function (imageSource) {
         var ctx =Module["canvascontext"];
         var img = canvas.createImage();
         img.src = imageSource;
-    
         img.onload = function () {            
-            ctx.drawImage(img, 0, 0, img.width, img.height)
+            ctx.drawImage(img, 0, 0, img.width, img.height);
             var imgData = ctx.getImageData(0, 0, canvas.width, canvas.width);
-            resolve(cv.matFromImageData(imgData));            
+            resolve(cv.matFromImageData(imgData));          
+            
         }
         img.onerror=function(evt){
             console.log(evt);
@@ -6540,6 +6540,7 @@ Module["imshow"] = function (mat) {
     var depth = mat.type() % 8;
     var scale = depth <= cv.CV_8S ? 1 : depth <= cv.CV_32S ? 1 / 256 : 255;
     var shift = depth === cv.CV_8S || depth === cv.CV_16S ? 128 : 0;
+  
     mat.convertTo(img, cv.CV_8U, scale, shift);
     switch (img.type()) {
         case cv.CV_8UC1:
@@ -6552,7 +6553,7 @@ Module["imshow"] = function (mat) {
             break;
         default:
             throw new Error("Bad number of channels (Source image must have 1, 3 or 4 channels)");
-            return
+            return;
     }
     var imgData = canvas.createImageData(new Uint8ClampedArray(img.data),img.cols,img.rows);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -6562,13 +6563,13 @@ Module["imshow"] = function (mat) {
 
 function Range(start, end) {
     this.start = typeof start === "undefined" ? 0 : start;
-    this.end = typeof end === "undefined" ? 0 : end
+    this.end = typeof end === "undefined" ? 0 : end;
 }
 Module["Range"] = Range;
 
 function Point(x, y) {
     this.x = typeof x === "undefined" ? 0 : x;
-    this.y = typeof y === "undefined" ? 0 : y
+    this.y = typeof y === "undefined" ? 0 : y;
 }
 Module["Point"] = Point;
 
@@ -6821,13 +6822,13 @@ function init(args) {
         if (!Module["inited"]) {            
             wx.createSelectorQuery().select('#OffscreenCanvas').node(function (res) {
                 Module["canvas"] = res.node;
-                var dpr=wx.getSystemInfoSync().pixelRatio;
+                var dpr=1;
+                // var dpr=wx.getSystemInfoSync().pixelRatio;
                 Module["canvas"].width=res.node._width*dpr;
-                
                 Module["canvas"].height=res.node._height*dpr;
                 Module["canvascontext"]=Module["canvas"].getContext("2d");
                 Module["canvascontext"].scale(dpr,dpr);
-            }).exec()
+            }).exec();
             asm = createWasm();
             run();
             Module["inited"] = true;

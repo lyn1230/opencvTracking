@@ -7,17 +7,14 @@
   width: 750rpx;
   height: 100%; 
   box-sizing: border-box;
-  background-color: blue;
-  border: 3px solid black;
 } 
 .cameraClass {
+  position: absolute;
   width:288px;
   height:352px;  
-  /* top: -200%; */
-  background-color: burlywood;
-  border: 3px solid black;
+  top: -200%;
 }
-.canvasClass {  
+.canvasClass { 
   width:288px;
   height:352px;
   border: 3px solid yellow;
