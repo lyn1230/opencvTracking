@@ -106,6 +106,7 @@ let mask = null;
 
 //姿态估计
 let originalRotation;
+const modelSize = 2;
 //不知道放在哪里的变量
 
 
@@ -468,10 +469,8 @@ Page({
             flag_BB = 0; // 标志位：捕捉四组识别区域顶点坐标
             temp_4BBArray = []; // 重新捕捉四组识别区域顶点坐标
 
-            console.log(cv.KalmanFilter);
-            debugger;
-            KF = new cv.KalmanFilter(nStates, nMeasurements, nInputs, cv.CV_64F); // instantiate Kalman Filter
-            initKalmanFilter(KF, nStates, nMeasurements, nInputs, dt, cv);
+            // KF = new cv.KalmanFilter(nStates, nMeasurements, nInputs, cv.CV_64F); // instantiate Kalman Filter
+            // initKalmanFilter(KF, nStates, nMeasurements, nInputs, dt, cv);
             //更新光流追踪轨迹
             mask = new cv.Mat(frame.height, frame.width, cv.CV_8UC4, new cv.Scalar(0, 0, 0, 255));
 
@@ -490,8 +489,9 @@ Page({
               'y': newVertex.data32F[7]
             }];
 
-            var temp_pose = poseEstimate(marker_corner, frame.width, frame.height);
+            var temp_pose = poseEstimate(marker_corner, frame.width, frame.height, modelSize);
             originalRotation = rot2euler(temp_pose.rotation1);
+            console.log("angle:", originalRotation);
           }
         }
       }

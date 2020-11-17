@@ -1,4 +1,5 @@
-require("./posit1_patched.js");
+const { POS } = require("./posit1_patched.js");
+
 let showToast = function (description, duration = 1500, icon = 'success') {
   wx.showToast({
     title: description,
@@ -249,7 +250,7 @@ let init_kalmanFilter = function (KF, nStates, nMeasurements, nInputs, dt, cv) {
   KF.measurementMatrix.data64F[5 * nStates + 11] = 1; // yaw
 }
 
-let pose_estimate = function(marker_corner, width, height) {
+let pose_estimate = function(marker_corner, width, height, modelSize) {
   let canvasElement_width = width;
   let canvasElement_height = height;
 
