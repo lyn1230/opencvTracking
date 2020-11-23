@@ -8,11 +8,14 @@ const {
   rectangle,
   initKalmanFilter,
   poseEstimate,
-  rot2euler
+  rot2euler,
+  init_smoothBBArray,
+  window_smooth,
+  performance_monitoring
 } = require("../../utils/util");
 var cv;
 var listener;
-let count = 0;
+
 
 
 const cameraConfig = {
@@ -27,7 +30,9 @@ const cameraConfig = {
 };
 const performMonitor = { //性能监视器
   fps: 0, //帧率
-  frameCount: 0 //记录总共处理的帧数
+  frameCount: 0, //记录总共处理的帧数
+  frameRecognizedCount: 0,   //记录模板图被识别出来的帧数
+  recogRate: 0
 };
 let camera, renderer, scene; //three.js相关的三大要素
 
@@ -53,7 +58,8 @@ const templateImage = {
 let dev = {
   ifStartListen: true, //是否开启监听器
   image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
-  frameCount: 100 //识别几帧之后停止下一帧的获取
+  frameCount: 100, //识别几帧之后停止下一帧的获取
+  ifRecognized: false   //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
 };
 
 const currentFrameSet = {
@@ -82,6 +88,7 @@ const RANSAC_THRESH_high = 5;
 
 let p0 = null; //ORB
 let [maxCorners, qualityLevel, minDistance, blockSize] = [60, 0.3, 6, 5];
+let homography = null;
 
 //L-K相关：
 let LK_pointOld = null;
@@ -91,6 +98,14 @@ let oldGray = null;
 let flag_BB = 0;
 let temp_4BBArray = [];
 let smoothBBArray = new Array();
+
+let LK_pointNew = null;
+let st = null;
+let err = null;
+
+let winSize = null;
+let maxLevel = 2; // maxLevel 为使用的图像金字塔层数
+let criteria = null;
 
 
 //kalaman滤波初始化
@@ -107,6 +122,12 @@ let mask = null;
 //姿态估计
 let originalRotation;
 const modelSize = 2;
+
+//开启光流跟踪标志位
+let flag_track = 0;
+
+// 产生随机颜色值
+let color = [];
 //不知道放在哪里的变量
 
 
@@ -248,14 +269,14 @@ Page({
     let listener = wx.createCameraContext().onCameraFrame((res) => {
       if (cameraConfig.flag === false)
         return;
+      dev.ifRecognized = false;
       let timeStart = Date.now();
       cameraConfig.flag = false; //立即停止下一帧的获取，等待当前帧处理后，再处理下一帧
       cameraConfig.frame.data = new Uint8Array(res.data); //更新实时帧的图像数据
+
       that.handleFrame(); //将摄像头图像放置到webgl背景中（后续添加图像算法处理）
-      ++performMonitor.frameCount;
-      // console.log("run time:", (Date.now() - timeStart), "ms");
-      performMonitor.fps = 1000 / (Date.now() - timeStart);
-      // console.log("FPS:", performMonitor.fps);
+      
+      performance_monitoring(performMonitor, dev.ifRecognized, timeStart);   //性能测试
     });
     if (dev.ifStartListen) {
       listener.start();
@@ -274,16 +295,27 @@ Page({
     currentFrameSet.KNN_Matches = new cv.DMatchVectorVector();
     cameraConfig.newVertex = new cv.Mat();
     cameraConfig.oldVertex = new cv.Mat();
-  
-   
+
+
 
     //不知道放在哪里的变量
     LK_pointOld = new cv.Mat();
     LK_pointOrigin = new cv.Mat();
     oldGray = new cv.Mat();
+    LK_pointNew = new cv.Mat();
+    st = new cv.Mat();
+    err = new cv.Mat();
+    winSize = new cv.Size(15, 15);
+    criteria = new cv.TermCriteria(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.01);
     KF = new cv.Mat();
     mask = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4, new cv.Scalar(0, 0, 0, 255));
     p0 = new cv.Mat();
+    homography = new cv.Mat();
+    //产生颜色的随机值
+    for (let i = 0; i < currentFrameSet.feature_size; i++) {
+      color.push(new cv.Scalar(parseInt(Math.random() * 255), parseInt(Math.random() * 255),
+        parseInt(Math.random() * 255), 255));
+    }
   },
 
   handleFrame() {
@@ -291,14 +323,21 @@ Page({
     //this.setBackImage();    //此处后续要添加3D模型的渲染
     if (performMonitor.frameCount < dev.frameCount) {
       cameraConfig.flag = true; //每一帧图像处理完成，标志位更新，继续获取下一帧
-    } else {
-      console.log(`识别出${count}帧`);
+    } else {   //处理完所有的帧之后，输出性能测试结果
+      console.log("识别出的帧数：", performMonitor.frameRecognizedCount);
+      console.log("总共处理的帧数：", performMonitor.frameCount);
+      console.log("识别率：", performMonitor.recogRate);
+      console.log("帧率：", performMonitor.fps);
     }
   },
 
   findNaturlImage() {
-    this.findFeaturePoints(); //找到初始角点
-    //await this.tracking();             //特征点跟踪
+    let that = this;
+    if (flag_track == 0) {
+      that.findFeaturePoints(); //找到初始角点
+    } else {
+      that.tracking(); //特征点跟踪
+    }
   },
 
   tempHandle: async function () {
@@ -361,7 +400,7 @@ Page({
         KNN_Matches = new cv.DMatchVectorVector();
         matcher.knnMatch(descriptors, originalDescriptorsArray[i], KNN_Matches, 2);
         // 筛选goodmatches良好匹配
-        console.log(`找到了${KNN_Matches.size()}个匹配点对`);
+        // console.log(`找到了${KNN_Matches.size()}个匹配点对`);
         for (let j = 0; j < KNN_Matches.size(); j++) {
           if (KNN_Matches.get(j).size() < 2) continue;
           let m = KNN_Matches.get(j).get(0);
@@ -370,7 +409,7 @@ Page({
             goodMatches.push_back(m);
           }
         }
-        console.log("良好的点对个数：", goodMatches.size());
+        // console.log("良好的点对个数：", goodMatches.size());
         if (goodMatches.size() > 20) {
           tempImage_id = i;
           break;
@@ -420,16 +459,16 @@ Page({
         if (inlierSize / goodMatches.size() >= Min_InlierRatio && inlierSize >= 15) {
           console.log("特征匹配单应矩阵内点数量：", inlierSize);
 
-          // 对坐标点进行投射变换,利用单应性矩阵,将原始四顶点objectBB得到新的对应四顶点newVertex
+          // 对坐标点进行投射变换,利用单应性矩阵,将原始四顶点objectBB得到新的对应四顶点newVertex    
           cv.perspectiveTransform(vertexArray[tempImage_id], newVertex, homography);
 
           // 判断识别区域是否大致符合四边形
           if (rectangle(newVertex)) {
-            oldVertex = newVertex;
+            cameraConfig.oldVertex = newVertex;
             draw_bounding_box(currentFrame, newVertex, cv); // 画出识别区域四周边框
             cv.imshow(currentFrame);
             console.log(`耗时${Date.now()-startTime}ms`);
-            count++;
+            
 
             //利用goodFeaturesToTrack去提取识别区域角点信息
             let mask_track = new cv.Mat.zeros(frame.height, frame.width, cv.CV_8UC1);
@@ -440,7 +479,7 @@ Page({
               newVertex.data32F[6], newVertex.data32F[7]
             ]);
             let square_points = cv.matFromArray(4, 1, cv.CV_32SC2, square_point_data);
-            cv.fillConvexPoly(mask_track, square_points, new cv.Scalar(255));    
+            cv.fillConvexPoly(mask_track, square_points, new cv.Scalar(255));
             cv.goodFeaturesToTrack(currentGray, p0, maxCorners, qualityLevel, minDistance, mask_track, blockSize);
             console.log("goodfeature:", p0.size().height);
             if (p0.size().height < 0) {
@@ -465,7 +504,7 @@ Page({
 
             currentGray.copyTo(oldGray);
             originLKPointSize = inlierSize; //更新lk光流初始追踪特征的数量
-            //flag_track = 1; // 开启光流追踪标志
+            flag_track = 1; // 开启光流追踪标志
             flag_BB = 0; // 标志位：捕捉四组识别区域顶点坐标
             temp_4BBArray = []; // 重新捕捉四组识别区域顶点坐标
 
@@ -501,8 +540,180 @@ Page({
   },
 
   tracking: function () {
+    let {
+      currentFrame,
+      currentGray
+    } = currentFrameSet;
+
+    currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
+    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化  
+
+
+    cv.calcOpticalFlowPyrLK(oldGray, currentGray, LK_pointOld, LK_pointNew, st, err, winSize, maxLevel, criteria);
+
+    this.calculate_transform_new();
 
   },
+
+  calculate_transform_new: function () {
+
+    let {
+      newVertex,
+      oldVertex
+    } = cameraConfig;
+
+    let {
+      currentGray,
+      currentFrame
+    } = currentFrameSet;
+
+    flag_track = 0; // 将光流标志位重置为0
+
+    let good_cnt = 0; // 初步光流追踪成功的数量
+    let inlierSize = 0; // 经ransac算法处理后成功识别的数量
+    for (let i = 0; i < st.rows; i++) {
+      if (st.data[i] === 1) {
+        good_cnt++;
+      }
+    }
+    // console.log("追踪成功的点", good_cnt);
+
+
+    let goodNew = new cv.Mat(good_cnt, 1, cv.CV_32FC2); //存储光流跟踪到的角点
+    let goodOld = new cv.Mat(good_cnt, 1, cv.CV_32FC2); //存储原始的托马斯角点
+    let goodOrigin = new cv.Mat(good_cnt, 1, cv.CV_32FC2);
+
+    var distance_xy = 0;
+    var j = 0;
+    for (let i = 0; i < st.rows; i++) {
+      if (st.data[i] === 1) {
+        goodNew.data32F[2 * j] = LK_pointNew.data32F[i * 2];
+        goodNew.data32F[2 * j + 1] = LK_pointNew.data32F[i * 2 + 1];
+
+        goodOld.data32F[2 * j] = LK_pointOld.data32F[i * 2];
+        goodOld.data32F[2 * j + 1] = LK_pointOld.data32F[i * 2 + 1];
+
+        /*goodOrigin.data32F[2 * j] = LK_pointOrigin.data32F[i * 2];
+        goodOrigin.data32F[2 * j + 1] = LK_pointOrigin.data32F[i * 2 + 1];*/
+
+        j++;
+      }
+    }
+
+
+    // 至少满足单应性所需的四组对应点
+    if (good_cnt >= 4) {
+
+
+      let inlierMask = new cv.Mat();
+      // 计算多个二维点对之间的最优单映射变换矩阵 H（3行x3列） ，使用最小均方误差或者RANSAC方法
+      //                homography = cv.findHomography(goodOrigin, goodNew, cv.RANSAC, RANSAC_THRESH_high, inlierMask);
+      homography = cv.findHomography(goodOld, goodNew, cv.RANSAC, RANSAC_THRESH_high, inlierMask);
+
+      if (!homography.empty()) {
+        // 更新inlierMask,即正确匹配的点
+        for (let i = 0; i < good_cnt; i++) {
+          if (inlierMask.charAt(i) == 1) {
+            inlierSize += 1;
+          }
+        }
+
+
+        //                    console.log("inlier:", inlierSize, originLKPointSize);
+        // 若符合阈值条件，则认为成功识别出区域，进行画框处理
+        if (inlierSize / originLKPointSize >= Min_InlierRatio || inlierSize >= Min_InlierSize) {
+
+          //                            cv.perspectiveTransform(originBB, newBB, homography);    
+
+          cv.perspectiveTransform(oldVertex, newVertex, homography);
+
+
+
+          if (flag_BB < 4) {
+            temp_4BBArray.push(newVertex);
+            flag_BB++;
+            if (flag_BB == 4) {
+              init_smoothBBArray(smoothBBArray, temp_4BBArray);
+            }
+          } else {
+            //                            console.log("old:",newBB.data32F[0],newBB.data32F[1]);
+            newVertex = window_smooth(smoothBBArray, newVertex, cv);
+            //                            console.log("new:",newBB.data32F[0],newBB.data32F[1]);
+          }
+
+
+          draw_bounding_box(currentFrame, newVertex, cv);
+          dev.ifRecognized = true;
+
+          // // 进行模型渲染??????????????????
+          // model_poseUpdate(newBB);
+
+          //                        solvePnP();
+
+          /* // 画出特征匹配结果
+           drawMatches1(originalFrameArray[flag_index], newFrame, goodOrigin, goodNew, grayMatchingImage, color, good_cnt, originalBBArray[flag_index], newBB);
+           cv.imshow("outputCanvas", grayMatchingImage);*/
+
+
+
+
+
+          // 绘制角点的轨迹
+          for (let i = 0; i < good_cnt; i++) {
+            /* try {
+                 cv.line(mask,
+                     {x: goodNew.data32F[2 * i], y: goodNew.data32F[2 * i + 1]},
+                     {x: goodOld.data32F[2 * i], y: goodOld.data32F[2 * i + 1]},
+                     color[i], 1);
+             } catch (error) {
+                 console.log(error)
+                 flag_track = 0;
+                 return;
+             }*/
+
+            cv.circle(currentFrame, {
+              x: goodNew.data32F[2 * i],
+              y: goodNew.data32F[2 * i + 1]
+            }, 5, color[0], -1);
+          }
+          cv.add(currentFrame, mask, currentFrame);
+
+
+
+          cv.imshow(currentFrame);
+
+
+          // 更新各个所需变量
+          flag_track = 1;
+          oldVertex = newVertex; // 更新顶点坐标
+          currentGray.copyTo(oldGray); //更新上一帧图像
+
+          //更新上一帧中成功匹配homograpyh的追踪点
+          LK_pointOld.delete();
+          LK_pointOld = null;
+          LK_pointOld = new cv.Mat(inlierSize, 1, cv.CV_32FC2);
+
+          //更新原始模板图片对应的追踪点
+          LK_pointOrigin.delete();
+          LK_pointOrigin = null;
+          LK_pointOrigin = new cv.Mat(inlierSize, 1, cv.CV_32FC2);
+          var j = 0;
+          for (let i = 0; i < good_cnt; i++) {
+            if (inlierMask.charAt(i) == 1) {
+              LK_pointOld.data32F[j * 2] = goodNew.data32F[2 * i];
+              LK_pointOld.data32F[j * 2 + 1] = goodNew.data32F[2 * i + 1];
+
+              LK_pointOrigin.data32F[j * 2] = goodOrigin.data32F[2 * i];
+              LK_pointOrigin.data32F[j * 2 + 1] = goodOrigin.data32F[2 * i + 1];
+
+              j++;
+            }
+          }
+        }
+      }
+    }
+  },
+
 
 
 

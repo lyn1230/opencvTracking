@@ -283,6 +283,49 @@ let rot_toeuler = function(rotation) {
 
   return {x: thetaX, y: thetaY, z: thetaZ};
 }
+let initSmoothBBArray = function(smoothBBArray,temp_4BBArray) {
+  for(let w=0;w<8;w++){
+
+      let temp_bb = [];
+      for(let h=0;h<4;h++){
+          temp_bb.push(temp_4BBArray[h].data32F[w]);
+      }
+
+      smoothBBArray[w] = temp_bb;
+  }
+}
+
+let windowSmooth = function(smoothBBArray, newBB, cv) {
+  let BB = new cv.Mat(4, 1, cv.CV_32FC2);
+
+  for(let i=0;i<8;i++){
+      BB.data32F[i] = (3*smoothBBArray[i][0]-5*smoothBBArray[i][1]-3*smoothBBArray[i][2]+9*smoothBBArray[i][3]+31*newBB.data32F[i])/35;
+
+      let temp_smoothBB = new Array;
+      temp_smoothBB[0] = (9*smoothBBArray[i][0]+13*smoothBBArray[i][1]+12*smoothBBArray[i][2]+6*smoothBBArray[i][3]-5*newBB.data32F[i])/35;
+      temp_smoothBB[1] = (-3*smoothBBArray[i][0]+12*smoothBBArray[i][1]+17*smoothBBArray[i][2]+12*smoothBBArray[i][3]-3*newBB.data32F[i])/35;
+      temp_smoothBB[2] = (-5*smoothBBArray[i][0]+6*smoothBBArray[i][1]+12*smoothBBArray[i][2]+13*smoothBBArray[i][3]+9*newBB.data32F[i])/35;
+
+      smoothBBArray[i][0] = temp_smoothBB[0];
+      smoothBBArray[i][1] = temp_smoothBB[1];
+      smoothBBArray[i][2] = temp_smoothBB[2];
+      smoothBBArray[i][3] = BB.data32F[i];
+
+  }
+  return BB;
+}
+
+let performanceMonitoring = function(performMonitor, ifRecognized, timeStart){
+  ++performMonitor.frameCount;      
+  if(ifRecognized === true) {      //更新帧率和识别率    
+    let timeCost = Date.now() - timeStart;
+    performMonitor.fps = `${Math.round(1000 / timeCost)}/s`;
+    ++performMonitor.frameRecognizedCount;
+  }
+  performMonitor.recogRate = `${Math.round((performMonitor.frameRecognizedCount)/(performMonitor.frameCount)*100)}%`;
+  console.log("FPS:", performMonitor.fps);
+  console.log("识别率:", performMonitor.recogRate);
+}
 
 module.exports = {
   alertMini: showToast,
@@ -292,5 +335,8 @@ module.exports = {
   rectangle: judgeRectangle,
   initKalmanFilter: init_kalmanFilter,
   poseEstimate: pose_estimate,
-  rot2euler: rot_toeuler
+  rot2euler: rot_toeuler,
+  init_smoothBBArray: initSmoothBBArray,
+  window_smooth: windowSmooth,
+  performance_monitoring: performanceMonitoring
 };
