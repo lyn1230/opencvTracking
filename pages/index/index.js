@@ -58,7 +58,7 @@ const templateImage = {
 let dev = {
   ifStartListen: true, //是否开启监听器
   image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
-  frameCount: 100, //识别几帧之后停止下一帧的获取
+  frameCount: 200, //识别几帧之后停止下一帧的获取
   ifRecognized: false   //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
 };
 
