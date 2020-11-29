@@ -1,13 +1,15 @@
-/**
- * @author qiao / https://github.com/qiao
- * @author mrdoob / http://mrdoob.com
- * @author alteredq / http://alteredqualia.com/
- * @author WestLangley / http://github.com/WestLangley
- * @author erich666 / http://erichaines.com
- * @author ScieCode / http://github.com/sciecode
- */
+// import {
+// 	EventDispatcher,
+// 	MOUSE,
+// 	Quaternion,
+// 	Spherical,
+// 	TOUCH,
+// 	Vector2,
+// 	Vector3,
+// 	global as window
+// } from "./three.weapp.min.js";
 
-import {
+const {
 	EventDispatcher,
 	MOUSE,
 	Quaternion,
@@ -15,8 +17,9 @@ import {
 	TOUCH,
 	Vector2,
 	Vector3,
-	global as window
-} from "./three.weapp.min.js";
+	global
+} = require("./three.weapp.min.js");
+let win = global;
 
 // This set of controls performs orbiting, dollying (zooming), and panning.
 // Unlike TrackballControls, it maintains the "up" direction object.up (+Y by default).
@@ -267,7 +270,7 @@ var OrbitControls = function (object, domElement) {
 		document.removeEventListener('mousemove', onMouseMove, false);
 		document.removeEventListener('mouseup', onMouseUp, false);
 
-		window.removeEventListener('keydown', onKeyDown, false);
+		win.removeEventListener('keydown', onKeyDown, false);
 
 		//scope.dispatchEvent( { type: 'dispose' } ); // should this be added here?
 
@@ -768,7 +771,7 @@ var OrbitControls = function (object, domElement) {
 		// Manually set the focus since calling preventDefault above
 		// prevents the browser from setting it automatically.
 
-		scope.domElement.focus ? scope.domElement.focus() : window.focus();
+		scope.domElement.focus ? scope.domElement.focus() : win.focus();
 
 		switch (event.button) {
 
@@ -1145,7 +1148,7 @@ var OrbitControls = function (object, domElement) {
 	scope.domElement.addEventListener('touchend', onTouchEnd, false);
 	scope.domElement.addEventListener('touchmove', onTouchMove, false);
 
-	window.addEventListener('keydown', onKeyDown, false);
+	win.addEventListener('keydown', onKeyDown, false);
 
 	// force an update at start
 
@@ -1180,4 +1183,4 @@ var MapControls = function (object, domElement) {
 MapControls.prototype = Object.create(EventDispatcher.prototype);
 MapControls.prototype.constructor = MapControls;
 
-export { OrbitControls, MapControls };
+module.exports =  { OrbitControls, MapControls };

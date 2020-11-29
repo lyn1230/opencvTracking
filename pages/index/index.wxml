@@ -1,13 +1,15 @@
 <view class="container">
 	<camera frame-size="{{frameSize}}" device-position="front" class="cameraClass"></camera>
-	<!-- <canvas type="webgl" id="canvasId" canvas-id="canvasId" class="canvasClass" disable-scroll="true"></canvas> -->
 </view>
 <canvas id="OffscreenCanvas" type="2d" class="canvasClass" disable-scroll="true"></canvas>
-<video src="https://www.wechatvr.org/banner.mp4" muted controls="false" show-play-btn="false"
-	show-center-play-btn="false" loop autoplay></video>
+
+<canvas type="webgl" id="myCanvas" class="animaionClass"></canvas>
+
+<!-- <video src="https://www.wechatvr.org/banner.mp4" muted controls="false" show-play-btn="false"
+	show-center-play-btn="false" loop autoplay></video> -->
 
 
-<!-- <canvas type="webgl" id="myCanvas" style="border: solid 1px red"></canvas> -->
+
 
 
 

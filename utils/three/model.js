@@ -1,15 +1,14 @@
-import { registerFBXLoader } from './three/FBXLoader_new.js'
-import { OrbitControls } from './three/OrbitControls_new.js'
-
+const { registerFBXLoader } = require("./FBXLoader_new.js");
+const { OrbitControls } = require("./OrbitControls_new.js");
 
 let container, stats, controls;
-var fbxModelLoad = (canvas, animationUrl, THREE, w, h) => {  
+function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {  
   if(! /.fbx/i.test(animationUrl)){
       return ;
   }
   let play_type = 1 ;
   registerFBXLoader(THREE);
-  resisterColladaLoader(THREE);
+//   resisterColladaLoader(THREE);
   let camera, scene, renderer, light;
   let frame = 0;
   let clock = new THREE.Clock();
@@ -28,9 +27,9 @@ var fbxModelLoad = (canvas, animationUrl, THREE, w, h) => {
     lookAt_y: 0,
     lookAt_z: 0
   };
-  init();
 
-  function init() { 
+
+ 
 
     animationUrlSpecial = /(.+)\.fbx/i.exec(animationUrl.slice(animationUrl.lastIndexOf("/") + 1))[1];
     if(animationUrlSpecial == "sd_laoweng"){
@@ -80,15 +79,11 @@ var fbxModelLoad = (canvas, animationUrl, THREE, w, h) => {
     let manager = new THREE.LoadingManager();
     var loader = new THREE.FBXLoader(manager);
     try{
-        loader.load(animationUrl, function (fbx) {
+         loader.load(animationUrl, function (fbx) {
 
-            //console.log(fbx);
             model = fbx;
-            scene.add(model);  
-            console.log(`${model}&&${model.position}`);       
-            model.rotation.x = 0.5;
-            model.rotation.y = 0.5;
-            model.rotation.z = 0.5;
+            scene.add(model);            
+            
             fbx.mixer = new THREE.AnimationMixer(fbx);
             mixers.push(fbx.mixer);
             if(fbx.animations.length != 0){
@@ -96,7 +91,8 @@ var fbxModelLoad = (canvas, animationUrl, THREE, w, h) => {
                 var action = fbx.mixer.clipAction(fbx.animations[0]);
                 action.setEffectiveTimeScale ( 0.8 ).play();
             }  
-            wx.hideLoading();    
+            // wx.hideLoading();  
+            callback(model);  
           }, undefined, onError);
     }catch(e){
         console.log(e);
@@ -110,7 +106,7 @@ var fbxModelLoad = (canvas, animationUrl, THREE, w, h) => {
       controls = new OrbitControls(camera, renderer.domElement);      
       controls.update();
       animate();
-  }
+
 
   //three.js播放动画
   function animate() {      
@@ -136,6 +132,8 @@ var fbxModelLoad = (canvas, animationUrl, THREE, w, h) => {
   function render() {     
     renderer.render( scene, camera );
   }  
+  console.log("原始model：", model);
+  return model;
 }
 
 

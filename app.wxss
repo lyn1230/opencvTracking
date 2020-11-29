@@ -18,4 +18,15 @@
   width:288px;
   height:352px;
   border: 3px solid yellow;
+  background-color: yellow;
+  /* z-index:1; */
+}
+.animaionClass {
+  position: absolute;
+  top: 0;
+  width:288px;
+  height:352px;
+  border: 3px solid red;
+  background-color: red;
+  /* z-index: 10000; */
 }

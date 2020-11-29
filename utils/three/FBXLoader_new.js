@@ -1,6 +1,6 @@
-import { createZlib } from "./inflate.min.js";
+const { createZlib } = require("./inflate.min.js");
 var Zlib = createZlib();
-export function registerFBXLoader(THREE){		
+let registerFBXLoader = function(THREE){		
 	THREE.FBXLoader = ( function () {
 
 	function FBXLoader(manager) {
@@ -3813,4 +3813,8 @@ export function registerFBXLoader(THREE){
 	return FBXLoader;
 
 } )();
+};
+
+module.exports = {
+	registerFBXLoader: registerFBXLoader
 }

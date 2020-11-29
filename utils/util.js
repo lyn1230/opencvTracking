@@ -1,4 +1,6 @@
-const { POS } = require("./posit1_patched.js");
+const {
+  POS
+} = require("./posit1_patched.js");
 
 let showToast = function (description, duration = 1500, icon = 'success') {
   wx.showToast({
@@ -250,7 +252,7 @@ let init_kalmanFilter = function (KF, nStates, nMeasurements, nInputs, dt, cv) {
   KF.measurementMatrix.data64F[5 * nStates + 11] = 1; // yaw
 }
 
-let pose_estimate = function(marker_corner, width, height, modelSize) {
+let pose_estimate = function (marker_corner, width, height, modelSize) {
   let canvasElement_width = width;
   let canvasElement_height = height;
 
@@ -258,21 +260,27 @@ let pose_estimate = function(marker_corner, width, height, modelSize) {
   var corners = []; //marker_corner;
 
   for (var i = 0; i < marker_corner.length; ++i) {
-      corners.push({
-          x: (marker_corner[i].x - (canvasElement_width / 2)),
-          y: (canvasElement_height / 2) - marker_corner[i].y
-      })
+    corners.push({
+      x: (marker_corner[i].x - (canvasElement_width / 2)),
+      y: (canvasElement_height / 2) - marker_corner[i].y
+    })
   }
 
   // compute the pose from the canvas
   var posit = new POS.Posit(modelSize, canvasElement_width);
   var pose = posit.pose(corners);
-  if (pose === null)    return;
+  if (pose === null) return;
 
-  return {rotation1: pose.bestRotation,  translation: pose.bestTranslation, rotation2: pose.alternativeRotation, error1:pose.bestError, error2:pose.alternativeError};
+  return {
+    rotation1: pose.bestRotation,
+    translation: pose.bestTranslation,
+    rotation2: pose.alternativeRotation,
+    error1: pose.bestError,
+    error2: pose.alternativeError
+  };
 }
 
-let rot_toeuler = function(rotation) {
+let rot_toeuler = function (rotation) {
   var thetaX;
   var thetaY;
   var thetaZ;
@@ -281,43 +289,47 @@ let rot_toeuler = function(rotation) {
   thetaY = Math.atan2(rotation[2][0], Math.sqrt(rotation[2][1] * rotation[2][1] + rotation[2][2] * rotation[2][2]));
   thetaZ = Math.atan2(rotation[1][0], rotation[0][0]);
 
-  return {x: thetaX, y: thetaY, z: thetaZ};
+  return {
+    x: thetaX,
+    y: thetaY,
+    z: thetaZ
+  };
 }
-let initSmoothBBArray = function(smoothBBArray,temp_4BBArray) {
-  for(let w=0;w<8;w++){
+let initSmoothBBArray = function (smoothBBArray, temp_4BBArray) {
+  for (let w = 0; w < 8; w++) {
 
-      let temp_bb = [];
-      for(let h=0;h<4;h++){
-          temp_bb.push(temp_4BBArray[h].data32F[w]);
-      }
+    let temp_bb = [];
+    for (let h = 0; h < 4; h++) {
+      temp_bb.push(temp_4BBArray[h].data32F[w]);
+    }
 
-      smoothBBArray[w] = temp_bb;
+    smoothBBArray[w] = temp_bb;
   }
 }
 
-let windowSmooth = function(smoothBBArray, newBB, cv) {
+let windowSmooth = function (smoothBBArray, newBB, cv) {
   let BB = new cv.Mat(4, 1, cv.CV_32FC2);
 
-  for(let i=0;i<8;i++){
-      BB.data32F[i] = (3*smoothBBArray[i][0]-5*smoothBBArray[i][1]-3*smoothBBArray[i][2]+9*smoothBBArray[i][3]+31*newBB.data32F[i])/35;
+  for (let i = 0; i < 8; i++) {
+    BB.data32F[i] = (3 * smoothBBArray[i][0] - 5 * smoothBBArray[i][1] - 3 * smoothBBArray[i][2] + 9 * smoothBBArray[i][3] + 31 * newBB.data32F[i]) / 35;
 
-      let temp_smoothBB = new Array;
-      temp_smoothBB[0] = (9*smoothBBArray[i][0]+13*smoothBBArray[i][1]+12*smoothBBArray[i][2]+6*smoothBBArray[i][3]-5*newBB.data32F[i])/35;
-      temp_smoothBB[1] = (-3*smoothBBArray[i][0]+12*smoothBBArray[i][1]+17*smoothBBArray[i][2]+12*smoothBBArray[i][3]-3*newBB.data32F[i])/35;
-      temp_smoothBB[2] = (-5*smoothBBArray[i][0]+6*smoothBBArray[i][1]+12*smoothBBArray[i][2]+13*smoothBBArray[i][3]+9*newBB.data32F[i])/35;
+    let temp_smoothBB = new Array;
+    temp_smoothBB[0] = (9 * smoothBBArray[i][0] + 13 * smoothBBArray[i][1] + 12 * smoothBBArray[i][2] + 6 * smoothBBArray[i][3] - 5 * newBB.data32F[i]) / 35;
+    temp_smoothBB[1] = (-3 * smoothBBArray[i][0] + 12 * smoothBBArray[i][1] + 17 * smoothBBArray[i][2] + 12 * smoothBBArray[i][3] - 3 * newBB.data32F[i]) / 35;
+    temp_smoothBB[2] = (-5 * smoothBBArray[i][0] + 6 * smoothBBArray[i][1] + 12 * smoothBBArray[i][2] + 13 * smoothBBArray[i][3] + 9 * newBB.data32F[i]) / 35;
 
-      smoothBBArray[i][0] = temp_smoothBB[0];
-      smoothBBArray[i][1] = temp_smoothBB[1];
-      smoothBBArray[i][2] = temp_smoothBB[2];
-      smoothBBArray[i][3] = BB.data32F[i];
+    smoothBBArray[i][0] = temp_smoothBB[0];
+    smoothBBArray[i][1] = temp_smoothBB[1];
+    smoothBBArray[i][2] = temp_smoothBB[2];
+    smoothBBArray[i][3] = BB.data32F[i];
 
   }
   return BB;
 }
 
-let performanceMonitoring = function(performMonitor, ifRecognized, timeStart){
-  ++performMonitor.frameCount;      
-  if(ifRecognized === true) {      //更新帧率和识别率    
+let performanceMonitoring = function (performMonitor, ifRecognized, timeStart) {
+  ++performMonitor.frameCount;
+  if (ifRecognized === true) { //更新帧率和识别率    
     let timeCost = Date.now() - timeStart;
     performMonitor.fps = `${Math.round(1000 / timeCost)}/s`;
     ++performMonitor.frameRecognizedCount;
@@ -325,6 +337,86 @@ let performanceMonitoring = function(performMonitor, ifRecognized, timeStart){
   performMonitor.recogRate = `${Math.round((performMonitor.frameRecognizedCount)/(performMonitor.frameCount)*100)}%`;
   console.log("FPS:", performMonitor.fps);
   console.log("识别率:", performMonitor.recogRate);
+}
+
+let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model, cv) {
+  var marker_corner = [{
+    'x': newBB.data32F[0],
+    'y': newBB.data32F[1]
+  }, {
+    'x': newBB.data32F[2],
+    'y': newBB.data32F[3]
+  }, {
+    'x': newBB.data32F[4],
+    'y': newBB.data32F[5]
+  }, {
+    'x': newBB.data32F[6],
+    'y': newBB.data32F[7]
+  }];
+
+  let pose = pose_estimate(marker_corner, w, h, modelSize);
+  console.log("pose:", pose);
+
+  let euler1 = rot_toeuler(pose.rotation1);
+  let euler2 = rot_toeuler(pose.rotation2);
+  console.log("euler1:", euler1);
+  console.log("euler2:", euler2);
+
+
+  if (Math.abs(pose.error1 / pose.error2) > 0.8) {
+    let distance1 = Math.abs(euler1.x - originalRotation.x) + Math.abs(euler1.y - originalRotation.y) + Math.abs(euler1.z - originalRotation.z);
+    let distance2 = Math.abs(euler2.x - originalRotation.x) + Math.abs(euler2.y - originalRotation.y) + Math.abs(euler2.z - originalRotation.z);
+    if (distance1 < distance2) {
+      originalRotation = euler1;
+      console.log("选择了euler1,error1:", pose.error1);
+    } else {
+      originalRotation = euler2;
+      console.log("选择了euler2,error2:", pose.error2);
+    }
+  } else {
+    console.log("选择了euler1,error1:", pose.error1);
+    originalRotation = euler1;
+  }
+  console.log("originalRotation:", originalRotation);
+
+  let translation_estimated = new cv.Mat(3, 1, cv.CV_64FC1);
+  let rotation_estimated = new cv.Mat(3, 3, cv.CV_64FC1);
+
+  // updateKalmanFilter(KF, pose.translation, originalRotation, translation_estimated, rotation_estimated);
+  // console.log(translation_estimated);
+
+  model.scale.x = modelSize;
+  model.scale.y = modelSize;
+  model.scale.z = modelSize;
+
+  /*角度估计*/
+  //卡尔曼滤波估计
+  // model.rotation.x = rotation_estimated.data64F[0];
+  // model.rotation.y = rotation_estimated.data64F[1];
+  // model.rotation.z = rotation_estimated.data64F[2];
+  //原始角度
+  model.rotation.x = 0;
+  model.rotation.y = 0;
+  model.rotation.z = 0;
+
+
+
+  /*位移估计*/
+  //卡尔曼滤波估计
+  //model.position.x = translation_estimated.data64F[0];
+  //model.position.y = translation_estimated.data64F[1];
+  //model.position.z = -translation_estimated.data64F[2];
+  //原始位移
+  model.position.x = pose.translation[0];
+  model.position.y = pose.translation[1];
+  model.position.z = -pose.translation[2];
+
+
+
+
+
+
+
 }
 
 module.exports = {
@@ -338,5 +430,6 @@ module.exports = {
   rot2euler: rot_toeuler,
   init_smoothBBArray: initSmoothBBArray,
   window_smooth: windowSmooth,
-  performance_monitoring: performanceMonitoring
+  performance_monitoring: performanceMonitoring,
+  model_poseUpdate: modelPoseUpdate
 };

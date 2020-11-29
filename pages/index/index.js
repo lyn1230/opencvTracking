@@ -1,7 +1,10 @@
-// const THREE = require("../../utils/three/three.min");
+const THREE = require("../../utils/three/three.weapp.min");
 const wasm = require("../../utils/wasm");
-// import { fbxModelLoad } from "../../utils/three/model";
-debugger;
+const {
+  fbxModelLoad
+} = require("../../utils/three/model");
+
+
 const {
   alertMini,
   init_originalFrameInfo,
@@ -13,7 +16,8 @@ const {
   rot2euler,
   init_smoothBBArray,
   window_smooth,
-  performance_monitoring
+  performance_monitoring,
+  model_poseUpdate
 } = require("../../utils/util");
 var cv;
 var listener;
@@ -33,10 +37,10 @@ const cameraConfig = {
 const performMonitor = { //性能监视器
   fps: 0, //帧率
   frameCount: 0, //记录总共处理的帧数
-  frameRecognizedCount: 0,   //记录模板图被识别出来的帧数
+  frameRecognizedCount: 0, //记录模板图被识别出来的帧数
   recogRate: 0
 };
-let camera, renderer, scene, markerObject3D; //three.js相关的三大要素
+let camera, renderer, scene, model, startListen; //three.js相关的三大要素
 
 const templateImage = {
   originalDescriptorsArray: new Array(),
@@ -58,11 +62,11 @@ const templateImage = {
   vertexArray: new Array()
 };
 let dev = {
-  ifStartListen: false, //是否开启监听器
+  ifStartListen: true, //是否开启监听器
   image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
-  frameCount: 200, //识别几帧之后停止下一帧的获取
-  ifRecognized: false,   //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
-  orb: 0    //使用了几次orb的方法（l-k几次跟丢）
+  frameCount: 500, //识别几帧之后停止下一帧的获取
+  ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
+  orb: 0 //使用了几次orb的方法（l-k几次跟丢）
 };
 
 const currentFrameSet = {
@@ -76,9 +80,7 @@ const currentFrameSet = {
   matcher: null,
   KNN_Matches: null
 };
-const nextFrameSet = {
-
-};
+const animationUrl = "https://weixin.wechatvr.org/animation/pig/fuzhu.fbx";
 
 
 
@@ -144,7 +146,7 @@ Page({
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
     this.frameSizeInit(); //自动适配实时帧的宽高
-    // this.webglInit();        //webgl初始化
+   
     this.getwasm(); //加载opencv.js，确保可以
   },
 
@@ -159,7 +161,7 @@ Page({
       self: this,
       success: function (Module) {
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
-        cv = Module;              
+        cv = Module;
         that.main();
       }
     });
@@ -268,7 +270,7 @@ Page({
     let that = this;
     this.varInit(); //变量初始化
     await this.tempHandle(); //处理模板图
-
+   
     let listener = wx.createCameraContext().onCameraFrame((res) => {
       if (cameraConfig.flag === false)
         return;
@@ -278,12 +280,16 @@ Page({
       cameraConfig.frame.data = new Uint8Array(res.data); //更新实时帧的图像数据
 
       that.handleFrame(); //将摄像头图像放置到webgl背景中（后续添加图像算法处理）
-      
-      performance_monitoring(performMonitor, dev.ifRecognized, timeStart);   //性能测试
+
+      performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
     });
-    if (dev.ifStartListen) {
-      listener.start();
-    }
+    startListen = function(resModel){
+      model = resModel;
+      if (dev.ifStartListen) {
+        listener.start();
+      }
+    }   
+    this.loadAnimation(animationUrl, startListen); 
   },
 
   /*需要用到cv的相关变量的定义*/
@@ -326,7 +332,7 @@ Page({
     //this.setBackImage();    //此处后续要添加3D模型的渲染
     if (performMonitor.frameCount < dev.frameCount) {
       cameraConfig.flag = true; //每一帧图像处理完成，标志位更新，继续获取下一帧
-    } else {   //处理完所有的帧之后，输出性能测试结果
+    } else { //处理完所有的帧之后，输出性能测试结果
       console.log("识别出的帧数：", performMonitor.frameRecognizedCount);
       console.log("总共处理的帧数：", performMonitor.frameCount);
       console.log("识别率：", performMonitor.recogRate);
@@ -386,8 +392,8 @@ Page({
     //得到实时帧的特征点和描述子
     currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
     cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
-    
-    
+
+
     if (1) {
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
       if (keyPoints.size() < 0.5 * feature_size) {
@@ -470,8 +476,8 @@ Page({
             cameraConfig.oldVertex = newVertex;
             draw_bounding_box(currentFrame, newVertex, cv); // 画出识别区域四周边框
             cv.imshow(currentFrame);
-            
-            
+
+
 
             //利用goodFeaturesToTrack去提取识别区域角点信息
             let mask_track = new cv.Mat.zeros(frame.height, frame.width, cv.CV_8UC1);
@@ -648,10 +654,8 @@ Page({
           draw_bounding_box(currentFrame, newVertex, cv);
           dev.ifRecognized = true;
 
-          // // 进行模型渲染??????????????????
-          // model_poseUpdate(newBB);
-
-          //                        solvePnP();
+          //进行模型渲染
+          model_poseUpdate(newVertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, originalRotation, model, cv);        
 
           /* // 画出特征匹配结果
            drawMatches1(originalFrameArray[flag_index], newFrame, goodOrigin, goodNew, grayMatchingImage, color, good_cnt, originalBBArray[flag_index], newBB);
@@ -724,19 +728,22 @@ Page({
 
   /* webgl相关*/
 
-
-  loadAnimation: function(modelUrl) { 
+  //加载动画
+  loadAnimation: function (modelUrl, callback) {
     let that = this;
-      const query = wx.createSelectorQuery().in(that);    
-      let nodeTemp = query.selectAll('#myCanvas');
-      nodeTemp.node();
-      query.exec(function (res) {      
-        let canvasId = res[0][0].node._canvasId;
-        const canvas = new THREE.global.registerCanvas(res[0][0].node)
-        that.setData({ canvasId })
-        //fbxModelLoad(canvas, animationUrl[id], THREE);
-        fbxModelLoad(canvas, modelUrl, THREE, globalData.innerWidth, globalData.innerHeight); 
-      }) 
+    let { height, width } = cameraConfig.frame;
+    const query = wx.createSelectorQuery().in(that);
+    let nodeTemp = query.selectAll('#myCanvas');
+    nodeTemp.node();
+    query.exec(function (res) {
+      let canvasId = res[0][0].node._canvasId;
+      const canvas = new THREE.global.registerCanvas(res[0][0].node)
+      that.setData({
+        canvasId
+      })
+      //fbxModelLoad(canvas, animationUrl[id], THREE);
+      model = fbxModelLoad(canvas, modelUrl, THREE, width, height, callback);
+    })
   },
 
 
@@ -757,14 +764,14 @@ Page({
 
         renderer = new THREE.WebGLRenderer({
           // canvas: webcanvas,
-          antialias: true,//反锯齿
-          alpha: true//透明
+          antialias: true, //反锯齿
+          alpha: true //透明
         });
         let ambient = new THREE.AmbientLight(0xF5F5F5);
         scene = new THREE.Scene();
         scene.add(ambient);
-        markerObject3D = new THREE.Object3D();
-        scene.add(markerObject3D);
+        model = new THREE.Object3D();
+        scene.add(model);
         console.log('完成webgl');
       });
   },
@@ -783,6 +790,7 @@ Page({
     scene.add(mesh);
     renderer.render(scene, camera);
   },
+
 
   /*图像帧尺寸自适应*/
   frameSizeInit() {
