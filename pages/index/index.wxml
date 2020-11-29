@@ -3,7 +3,31 @@
 	<!-- <canvas type="webgl" id="canvasId" canvas-id="canvasId" class="canvasClass" disable-scroll="true"></canvas> -->
 </view>
 <canvas id="OffscreenCanvas" type="2d" class="canvasClass" disable-scroll="true"></canvas>
-<!-- <canvas canvas-id="myCanvas" style="border: 1px solid;"/> -->
+<video src="https://www.wechatvr.org/banner.mp4" muted controls="false" show-play-btn="false"
+	show-center-play-btn="false" loop autoplay></video>
+
+
+<!-- <canvas type="webgl" id="myCanvas" style="border: solid 1px red"></canvas> -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 <!-- <camera device-position="front" flash="off" resolution="high" frame-size="small" binderror="error" style="width: 300px; height: 300px;margin:0 auto;" wx:hidden="{{true}}"></camera>
 <canvas id="OffscreenCanvas" class="OffscreenCanvas" type="2d" style="width:300px;height:300px;margin:0 auto;"></canvas>
