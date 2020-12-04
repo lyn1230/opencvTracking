@@ -6557,7 +6557,9 @@ Module["imshow"] = function (mat) {
     }
     var imgData = canvas.createImageData(new Uint8ClampedArray(img.data),img.cols,img.rows);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.putImageData(imgData, 0, 0);
+    const h = wx.getSystemInfoSync().windowHeight;
+    const w = wx.getSystemInfoSync().windowWidth;
+    ctx.putImageData(imgData, 0, 0, 0, 0, w, h);
     cv.imshowed=false;
 };
 

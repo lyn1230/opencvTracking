@@ -402,7 +402,7 @@ let registerFBXLoader = function(THREE){
 			// 		console.log(e);
 			//  });
 			 texture = loader.load( fileName , function (res){		
-				 console.log(res);		
+				//  console.log(res);		
 			 },null, function (e){
 					console.log(e);
 			 });
@@ -2068,11 +2068,11 @@ let registerFBXLoader = function(THREE){
 			} );
 
 			model = new THREE.SkinnedMesh( geometry, material );
-
+	
+		
 		} else {
-
 			model = new THREE.Mesh( geometry, material );
-
+			
 		}
 
 		return model;

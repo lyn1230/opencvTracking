@@ -27,12 +27,13 @@ var listener;
 const cameraConfig = {
   flag: true, //是否获取下一个实时帧 
   frame: { //实时帧数据
-    data: new Uint8Array(288 * 352),
+    data: null,
     width: 0,
     height: 0
   },
   newVertex: null,
-  oldVertex: null
+  oldVertex: null,
+  ifHasWidthAndHeight: false
 };
 const performMonitor = { //性能监视器
   fps: 0, //帧率
@@ -64,9 +65,10 @@ const templateImage = {
 let dev = {
   ifStartListen: true, //是否开启监听器
   image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
-  frameCount: 500, //识别几帧之后停止下一帧的获取
+  frameCount: 100, //识别几帧之后停止下一帧的获取
   ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
-  orb: 0 //使用了几次orb的方法（l-k几次跟丢）
+  orb: 0, //使用了几次orb的方法（l-k几次跟丢）
+  onlyDetect: false    //是否只使用detect的方案
 };
 
 const currentFrameSet = {
@@ -126,7 +128,7 @@ let mask = null;
 
 //姿态估计
 let originalRotation;
-const modelSize = 2;
+const modelSize = 1;
 
 //开启光流跟踪标志位
 let flag_track = 0;
@@ -146,7 +148,6 @@ Page({
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
     this.frameSizeInit(); //自动适配实时帧的宽高
-   
     this.getwasm(); //加载opencv.js，确保可以
   },
 
@@ -225,41 +226,43 @@ Page({
 
   detectFace: function (frame) {
     var self = this;
-    var src = cv.matFromImageData({
-      data: new Uint8ClampedArray(frame.data),
-      width: frame.width,
-      height: frame.height
-    });
-    var gray = new cv.Mat();
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-    var faces = new cv.RectVector();
-    let eyes = new cv.RectVector();
-    var faceCascade = self.faceCascade;
-    faceCascade.detectMultiScale(gray, faces, 1.1, 5, 0);
-    for (var i = 0; i < faces.size(); ++i) {
-      var roiGray = gray.roi(faces.get(i));
-      var roiSrc = src.roi(faces.get(i));
-      var point1 = new cv.Point(faces.get(i).x, faces.get(i).y);
-      var point2 = new cv.Point(faces.get(i).x + faces.get(i).width,
-        faces.get(i).y + faces.get(i).height);
-      cv.rectangle(src, point1, point2, [255, 0, 0, 255]);
+    var src = new cv.Mat(frame.height, frame.width, cv.CV_8UC4);
+    src.data.set(new Uint8ClampedArray(frame.data));
+    // var src = cv.matFromImageData({
+    //   data: new Uint8ClampedArray(frame.data),
+    //   width: frame.width,
+    //   height: frame.height
+    // });
+    // var gray = new cv.Mat();
+    // cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+    // var faces = new cv.RectVector();
+    // let eyes = new cv.RectVector();
+    // var faceCascade = self.faceCascade;
+    // faceCascade.detectMultiScale(gray, faces, 1.1, 5, 0);
+    // for (var i = 0; i < faces.size(); ++i) {
+    //   var roiGray = gray.roi(faces.get(i));
+    //   var roiSrc = src.roi(faces.get(i));
+    //   var point1 = new cv.Point(faces.get(i).x, faces.get(i).y);
+    //   var point2 = new cv.Point(faces.get(i).x + faces.get(i).width,
+    //     faces.get(i).y + faces.get(i).height);
+    //   cv.rectangle(src, point1, point2, [255, 0, 0, 255]);
 
-      var eyesCascade = self.eyesCascade;
-      eyesCascade.detectMultiScale(roiGray, eyes);
-      for (let j = 0; j < eyes.size(); ++j) {
-        let point1 = new cv.Point(eyes.get(j).x, eyes.get(j).y);
-        let point2 = new cv.Point(eyes.get(j).x + eyes.get(j).width,
-          eyes.get(j).y + eyes.get(j).height);
-        cv.rectangle(roiSrc, point1, point2, [0, 0, 255, 255]);
-      }
+    //   var eyesCascade = self.eyesCascade;
+    //   eyesCascade.detectMultiScale(roiGray, eyes);
+    //   for (let j = 0; j < eyes.size(); ++j) {
+    //     let point1 = new cv.Point(eyes.get(j).x, eyes.get(j).y);
+    //     let point2 = new cv.Point(eyes.get(j).x + eyes.get(j).width,
+    //       eyes.get(j).y + eyes.get(j).height);
+    //     cv.rectangle(roiSrc, point1, point2, [0, 0, 255, 255]);
+    //   }
 
-      roiGray.delete();
-      roiSrc.delete();
-    }
+    //   roiGray.delete();
+    //   roiSrc.delete();
+    // }
     cv.imshow(src);
     src.delete();
-    gray.delete();
-    faces.delete();
+    // gray.delete();
+    // faces.delete();
   },
 
   stop: function () {
@@ -270,31 +273,43 @@ Page({
     let that = this;
     this.varInit(); //变量初始化
     await this.tempHandle(); //处理模板图
-   
+
     let listener = wx.createCameraContext().onCameraFrame((res) => {
       if (cameraConfig.flag === false)
         return;
       dev.ifRecognized = false;
       let timeStart = Date.now();
       cameraConfig.flag = false; //立即停止下一帧的获取，等待当前帧处理后，再处理下一帧
-      cameraConfig.frame.data = new Uint8Array(res.data); //更新实时帧的图像数据
+      cameraConfig.frame.data = new Uint8ClampedArray(res.data); //更新实时帧的图像数据     
+      if(!cameraConfig.ifHasWidthAndHeight){      //防止无用的重复赋值
+        cameraConfig.frame.width = res.width;
+        cameraConfig.frame.height = res.height;
+        cameraConfig.frame.width = res.width;
+        currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
+        cameraConfig.ifHasWidthAndHeight = true;        
+      }      
+     
+      that.handleFrame(); 
 
-      that.handleFrame(); //将摄像头图像放置到webgl背景中（后续添加图像算法处理）
-
-      performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
+      //performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
     });
-    startListen = function(resModel){
+    startListen = function (resModel) {
       model = resModel;
+      console.log("动画的position:", model.position);
+
       if (dev.ifStartListen) {
         listener.start();
       }
-    }   
-    this.loadAnimation(animationUrl, startListen); 
+    };
+    if (dev.ifStartListen) {
+      listener.start();
+    }
+    // this.loadAnimation(animationUrl, startListen);
   },
 
   /*需要用到cv的相关变量的定义*/
   varInit: function () {
-    currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
+    // currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
     currentFrameSet.currentGray = new cv.Mat();
     currentFrameSet.detector = new cv.ORB(currentFrameSet.feature_size, 1.2, 1, 0);
     currentFrameSet.keyPoints = new cv.KeyPointVector();
@@ -343,11 +358,16 @@ Page({
 
   orbAndLKTrack() {
     let that = this;
-    if (flag_track == 0) {
-      that.findFeaturePoints(); //找到初始角点
+    if (dev.onlyDetect) {
+      that.findFeaturePoints();
     } else {
-      that.tracking(); //特征点跟踪
+      if (flag_track == 0) {
+        that.findFeaturePoints(); //找到初始角点
+      } else {
+        that.tracking(); //特征点跟踪
+      }
     }
+
   },
 
   tempHandle: async function () {
@@ -389,10 +409,11 @@ Page({
     } = cameraConfig;
 
 
-    //得到实时帧的特征点和描述子
-    currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
-    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
+    //得到实时帧的特征点和描述子    
+    currentFrame.data.set(frame.data); //摄像机图像的Mat格式
 
+    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
+  
 
     if (1) {
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
@@ -476,8 +497,7 @@ Page({
             cameraConfig.oldVertex = newVertex;
             draw_bounding_box(currentFrame, newVertex, cv); // 画出识别区域四周边框
             cv.imshow(currentFrame);
-
-
+            dev.ifRecognized = true;
 
             //利用goodFeaturesToTrack去提取识别区域角点信息
             let mask_track = new cv.Mat.zeros(frame.height, frame.width, cv.CV_8UC1);
@@ -544,7 +564,7 @@ Page({
         }
       }
     }
-
+    // currentFrame.delete();
 
   },
 
@@ -561,7 +581,7 @@ Page({
     cv.calcOpticalFlowPyrLK(oldGray, currentGray, LK_pointOld, LK_pointNew, st, err, winSize, maxLevel, criteria);
 
     this.calculate_transform_new();
-
+    // currentFrame.delete();
   },
 
   calculate_transform_new: function () {
@@ -655,7 +675,7 @@ Page({
           dev.ifRecognized = true;
 
           //进行模型渲染
-          model_poseUpdate(newVertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, originalRotation, model, cv);        
+          model_poseUpdate(newVertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, originalRotation, model, cv);
 
           /* // 画出特征匹配结果
            drawMatches1(originalFrameArray[flag_index], newFrame, goodOrigin, goodNew, grayMatchingImage, color, good_cnt, originalBBArray[flag_index], newBB);
@@ -731,7 +751,10 @@ Page({
   //加载动画
   loadAnimation: function (modelUrl, callback) {
     let that = this;
-    let { height, width } = cameraConfig.frame;
+    let {
+      height,
+      width
+    } = cameraConfig.frame;
     const query = wx.createSelectorQuery().in(that);
     let nodeTemp = query.selectAll('#myCanvas');
     nodeTemp.node();
@@ -741,8 +764,7 @@ Page({
       that.setData({
         canvasId
       })
-      //fbxModelLoad(canvas, animationUrl[id], THREE);
-      model = fbxModelLoad(canvas, modelUrl, THREE, width, height, callback);
+      fbxModelLoad(canvas, modelUrl, THREE, width, height, callback);
     })
   },
 
@@ -804,5 +826,15 @@ Page({
       cameraConfig.frame.width = 720;
       cameraConfig.frame.height = 1280;
     }
-  }
+  },
+
+  touchStart(e) {
+    THREE.global.touchEventHandlerFactory('canvas', 'touchstart')(e)
+  },
+  touchMove(e) {
+    THREE.global.touchEventHandlerFactory('canvas', 'touchmove')(e)
+  },
+  touchEnd(e) {
+    THREE.global.touchEventHandlerFactory('canvas', 'touchend')(e)
+  },
 })

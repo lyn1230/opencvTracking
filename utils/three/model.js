@@ -1,6 +1,7 @@
 const { registerFBXLoader } = require("./FBXLoader_new.js");
 const { OrbitControls } = require("./OrbitControls_new.js");
 
+
 let container, stats, controls;
 function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {  
   if(! /.fbx/i.test(animationUrl)){
@@ -50,7 +51,7 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
     }else if(animationUrlSpecial == "fuzhu"){
         tempObj = { 
             cameraFov: 20, 
-            position_z : 100, 
+            position_z : 4.8, 
         };
     }else if(animationUrlSpecial == "Suchominus-Animation"){
         tempObj = { 
@@ -61,9 +62,15 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
         };
     }
     Object.assign(canmeraConfig, tempObj);   
-    camera = new THREE.PerspectiveCamera(canmeraConfig.cameraFov, w / h, canmeraConfig.cameraNear, canmeraConfig.cameraFar);
+    // camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 1000);
+    // camera.position.set(canmeraConfig.position_x, canmeraConfig.position_y, 0);
+    // camera = new THREE.PerspectiveCamera(canmeraConfig.cameraFov, w / h, canmeraConfig.cameraNear, canmeraConfig.cameraFar);
+    camera = new THREE.PerspectiveCamera(canmeraConfig.cameraFov, w / h, 0.01, canmeraConfig.cameraFar);
+
     camera.position.set(canmeraConfig.position_x, canmeraConfig.position_y, canmeraConfig.position_z);
-    camera.lookAt(new THREE.Vector3(canmeraConfig.lookAt_x, canmeraConfig.lookAt_y, canmeraConfig.lookAt_z));
+
+    // camera.lookAt(new THREE.Vector3(canmeraConfig.lookAt_x, canmeraConfig.lookAt_y, canmeraConfig.lookAt_z));
+    camera.lookAt({x:0,y:0,z:0});
 
     scene = new THREE.Scene();
     light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
@@ -72,6 +79,24 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
     light = new THREE.DirectionalLight(0xffffff, 1.0);
     light.position.set(0, 1, 0);
     scene.add(light);
+    // var geometry = new THREE.CubeGeometry(1, 1, 1);
+    // // 添加three自带的最简单的一种材质
+    // var material = new THREE.MeshBasicMaterial({
+    //     color: 0xff0000,
+    // });
+//     let mesh = new THREE.Mesh(geometry, material);
+//     mesh.scale.set(0.1, 0.1, 0.1)
+//         model.add(mesh);        
+// scene.add(model);
+//             model.position.x = 1;
+//             model.position.y =0;
+//             model.position.z = 0;
+
+
+
+    //加网格
+    let gridHelper = new THREE.GridHelper( 100, 30, 0x2C2C2C, 0x888888 );
+    scene.add(gridHelper);
       
     let onError = function( xhr ) {
         console.log( xhr );
@@ -80,10 +105,20 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
     var loader = new THREE.FBXLoader(manager);
     try{
          loader.load(animationUrl, function (fbx) {
-
             model = fbx;
-            scene.add(model);            
-            
+            scene.add(model);
+
+            model.scale.x = 0.05;
+            model.scale.y = 0.05;
+            model.scale.z = 0.05;
+
+            model.position.x = 0;
+            model.position.y = 0;
+            model.position.z = 0;
+
+            var axes = new THREE.AxesHelper(90);
+            model.add(axes);
+            scene.add(axes);
             fbx.mixer = new THREE.AnimationMixer(fbx);
             mixers.push(fbx.mixer);
             if(fbx.animations.length != 0){
@@ -98,12 +133,14 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
         console.log(e);
     }
       renderer = new THREE.WebGLRenderer({ alpha:true });
+
+      renderer.setClearAlpha(0);
       renderer.setPixelRatio(wx.getSystemInfoSync().pixelRatio);
       renderer.setSize(w, h);
       renderer.gammaOutput = true;
       renderer.gammaFactor = 2.2;     
 
-      controls = new OrbitControls(camera, renderer.domElement);      
+      controls = new OrbitControls(camera, renderer.domElement); 
       controls.update();
       animate();
 
@@ -131,9 +168,7 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
   //three.js动画渲染
   function render() {     
     renderer.render( scene, camera );
-  }  
-  console.log("原始model：", model);
-  return model;
+  } 
 }
 
 

@@ -269,6 +269,7 @@ let pose_estimate = function (marker_corner, width, height, modelSize) {
   // compute the pose from the canvas
   var posit = new POS.Posit(modelSize, canvasElement_width);
   var pose = posit.pose(corners);
+
   if (pose === null) return;
 
   return {
@@ -339,6 +340,7 @@ let performanceMonitoring = function (performMonitor, ifRecognized, timeStart) {
   console.log("识别率:", performMonitor.recogRate);
 }
 
+
 let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model, cv) {
   var marker_corner = [{
     'x': newBB.data32F[0],
@@ -355,13 +357,9 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
   }];
 
   let pose = pose_estimate(marker_corner, w, h, modelSize);
-  console.log("pose:", pose);
 
   let euler1 = rot_toeuler(pose.rotation1);
   let euler2 = rot_toeuler(pose.rotation2);
-  console.log("euler1:", euler1);
-  console.log("euler2:", euler2);
-
 
   if (Math.abs(pose.error1 / pose.error2) > 0.8) {
     let distance1 = Math.abs(euler1.x - originalRotation.x) + Math.abs(euler1.y - originalRotation.y) + Math.abs(euler1.z - originalRotation.z);
@@ -385,9 +383,9 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
   // updateKalmanFilter(KF, pose.translation, originalRotation, translation_estimated, rotation_estimated);
   // console.log(translation_estimated);
 
-  model.scale.x = modelSize;
-  model.scale.y = modelSize;
-  model.scale.z = modelSize;
+  // model.scale.x = 0;
+  // model.scale.y = 0;
+  // model.scale.z = 0;
 
   /*角度估计*/
   //卡尔曼滤波估计
@@ -395,11 +393,11 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
   // model.rotation.y = rotation_estimated.data64F[1];
   // model.rotation.z = rotation_estimated.data64F[2];
   //原始角度
-  model.rotation.x = 0;
-  model.rotation.y = 0;
-  model.rotation.z = 0;
+  // model.rotation.x = 0;
+  // model.rotation.y = 0;
+  // model.rotation.z = 0;
 
-
+  console.log(pose.translation);
 
   /*位移估计*/
   //卡尔曼滤波估计
@@ -407,10 +405,15 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
   //model.position.y = translation_estimated.data64F[1];
   //model.position.z = -translation_estimated.data64F[2];
   //原始位移
-  model.position.x = pose.translation[0];
-  model.position.y = pose.translation[1];
-  model.position.z = -pose.translation[2];
+  let radio = 1;
+  model.position.x = (pose.translation[0])*radio;
+  model.position.y = (pose.translation[1])*radio;
+  model.position.z = (-pose.translation[2])*radio;
 
+
+  //测试
+  // a++;
+  // model.position.x = a;
 
 
 

@@ -221,6 +221,7 @@ POS.Posit.prototype.pos = function(imagePoints, rotation1, rotation2, translatio
     rotation2[1][i] = row2[i];
     rotation2[2][i] = row3[i];
   }
+// console.log("scale:", scale);
 
   //Translation
   translation[0] = imagePoints[0].x / scale;
