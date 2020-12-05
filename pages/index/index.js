@@ -142,7 +142,7 @@ let color = [];
 
 Page({
   data: {
-    frameSize: "small"
+    
   },
 
   //生命周期函数--监听页面初次渲染完成
@@ -286,12 +286,12 @@ Page({
         cameraConfig.frame.height = res.height;
         cameraConfig.frame.width = res.width;
         currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
-        cameraConfig.ifHasWidthAndHeight = true;        
+        cameraConfig.ifHasWidthAndHeight = true;   
       }      
      
       that.handleFrame(); 
 
-      //performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
+      performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
     });
     startListen = function (resModel) {
       model = resModel;
@@ -301,10 +301,10 @@ Page({
         listener.start();
       }
     };
-    if (dev.ifStartListen) {
-      listener.start();
-    }
-    // this.loadAnimation(animationUrl, startListen);
+    // if (dev.ifStartListen) {
+    //   listener.start();
+    // }
+    this.loadAnimation(animationUrl, startListen);
   },
 
   /*需要用到cv的相关变量的定义*/
@@ -760,10 +760,10 @@ Page({
     nodeTemp.node();
     query.exec(function (res) {
       let canvasId = res[0][0].node._canvasId;
-      const canvas = new THREE.global.registerCanvas(res[0][0].node)
-      that.setData({
-        canvasId
-      })
+      const canvas = new THREE.global.registerCanvas(res[0][0].node);
+      // that.setData({
+      //   canvasId
+      // })
       fbxModelLoad(canvas, modelUrl, THREE, width, height, callback);
     })
   },
@@ -816,15 +816,14 @@ Page({
 
   /*图像帧尺寸自适应*/
   frameSizeInit() {
-    if (this.data.frameSize === "small") {
+    const platform = wx.getSystemInfoSync().platform;
+    console.log(platform);
+    if( platform == "android" ){      //小米9的帧尺寸
+      cameraConfig.frame.width = 288;
+      cameraConfig.frame.height = 384;
+    } else if(platform == "devtools") {
       cameraConfig.frame.width = 288;
       cameraConfig.frame.height = 352;
-    } else if (this.data.frameSize === "medium") {
-      cameraConfig.frame.width = 480;
-      cameraConfig.frame.height = 640;
-    } else if (this.data.frameSize === "large") {
-      cameraConfig.frame.width = 720;
-      cameraConfig.frame.height = 1280;
     }
   },
 

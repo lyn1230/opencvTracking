@@ -366,16 +366,16 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
     let distance2 = Math.abs(euler2.x - originalRotation.x) + Math.abs(euler2.y - originalRotation.y) + Math.abs(euler2.z - originalRotation.z);
     if (distance1 < distance2) {
       originalRotation = euler1;
-      console.log("选择了euler1,error1:", pose.error1);
+      // console.log("选择了euler1,error1:", pose.error1);
     } else {
       originalRotation = euler2;
-      console.log("选择了euler2,error2:", pose.error2);
+      // console.log("选择了euler2,error2:", pose.error2);
     }
   } else {
-    console.log("选择了euler1,error1:", pose.error1);
+    // console.log("选择了euler1,error1:", pose.error1);
     originalRotation = euler1;
   }
-  console.log("originalRotation:", originalRotation);
+  // console.log("originalRotation:", originalRotation);
 
   let translation_estimated = new cv.Mat(3, 1, cv.CV_64FC1);
   let rotation_estimated = new cv.Mat(3, 3, cv.CV_64FC1);
@@ -397,7 +397,7 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
   // model.rotation.y = 0;
   // model.rotation.z = 0;
 
-  console.log(pose.translation);
+  // console.log(pose.translation);
 
   /*位移估计*/
   //卡尔曼滤波估计
@@ -405,10 +405,10 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
   //model.position.y = translation_estimated.data64F[1];
   //model.position.z = -translation_estimated.data64F[2];
   //原始位移
-  let radio = 1;
-  model.position.x = (pose.translation[0])*radio;
-  model.position.y = (pose.translation[1])*radio;
-  model.position.z = (-pose.translation[2])*radio;
+
+  model.position.x = pose.translation[0];
+  model.position.y = pose.translation[1];
+  model.position.z = -pose.translation[2];
 
 
   //测试

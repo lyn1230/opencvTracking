@@ -95,8 +95,8 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
 
 
     //加网格
-    let gridHelper = new THREE.GridHelper( 100, 30, 0x2C2C2C, 0x888888 );
-    scene.add(gridHelper);
+    // let gridHelper = new THREE.GridHelper( 100, 30, 0x2C2C2C, 0x888888 );
+    // scene.add(gridHelper);
       
     let onError = function( xhr ) {
         console.log( xhr );
@@ -116,9 +116,9 @@ function fbxModelLoad(canvas, animationUrl, THREE, w, h, callback) {
             model.position.y = 0;
             model.position.z = 0;
 
-            var axes = new THREE.AxesHelper(90);
-            model.add(axes);
-            scene.add(axes);
+            // var axes = new THREE.AxesHelper(90);
+            // model.add(axes);
+            // scene.add(axes);
             fbx.mixer = new THREE.AnimationMixer(fbx);
             mixers.push(fbx.mixer);
             if(fbx.animations.length != 0){
