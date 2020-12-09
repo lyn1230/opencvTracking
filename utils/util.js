@@ -128,47 +128,91 @@ let initOriginalBB = function (vertexArray, cv) {
 };
 
 // 画出识别图四周框
-let drawBoundingBox = function (img, bb, cv) {
-  cv.line(
-    img, {
-      x: bb.data32F[0],
-      y: bb.data32F[1]
-    }, {
-      x: bb.data32F[2],
-      y: bb.data32F[3]
-    },
-    [255, 0, 0, 255],
-    3);
-  cv.line(
-    img, {
-      x: bb.data32F[2],
-      y: bb.data32F[3]
-    }, {
-      x: bb.data32F[4],
-      y: bb.data32F[5]
-    },
-    [255, 0, 0, 255],
-    3);
-  cv.line(
-    img, {
-      x: bb.data32F[4],
-      y: bb.data32F[5]
-    }, {
-      x: bb.data32F[6],
-      y: bb.data32F[7]
-    },
-    [255, 0, 0, 255],
-    3);
-  cv.line(
-    img, {
-      x: bb.data32F[6],
-      y: bb.data32F[7]
-    }, {
-      x: bb.data32F[0],
-      y: bb.data32F[1]
-    },
-    [255, 0, 0, 255],
-    3);
+let drawBoundingBox = function (img, bb, cv, type="mat") {
+  if(type == "number"){
+    cv.line(
+      img, {
+        x: bb[0],
+        y: bb[1]
+      }, {
+        x: bb[2],
+        y: bb[3]
+      },
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img, {
+        x: bb[2],
+        y: bb[3]
+      }, {
+        x: bb[4],
+        y: bb[5]
+      },
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img, {
+        x: bb[4],
+        y: bb[5]
+      }, {
+        x: bb[6],
+        y: bb[7]
+      },
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img, {
+        x: bb[6],
+        y: bb[7]
+      }, {
+        x: bb[0],
+        y: bb[1]
+      },
+      [255, 0, 0, 255],
+      3);
+  } else {
+    cv.line(
+      img, {
+        x: bb.data32F[0],
+        y: bb.data32F[1]
+      }, {
+        x: bb.data32F[2],
+        y: bb.data32F[3]
+      },
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img, {
+        x: bb.data32F[2],
+        y: bb.data32F[3]
+      }, {
+        x: bb.data32F[4],
+        y: bb.data32F[5]
+      },
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img, {
+        x: bb.data32F[4],
+        y: bb.data32F[5]
+      }, {
+        x: bb.data32F[6],
+        y: bb.data32F[7]
+      },
+      [255, 0, 0, 255],
+      3);
+    cv.line(
+      img, {
+        x: bb.data32F[6],
+        y: bb.data32F[7]
+      }, {
+        x: bb.data32F[0],
+        y: bb.data32F[1]
+      },
+      [255, 0, 0, 255],
+      3);
+  }
+ 
 };
 
 let judgeRectangle = function (newBB) {
