@@ -271,11 +271,14 @@ var STACK_BASE = 6506912,
 var INITIAL_INITIAL_MEMORY = 134217728;
 wasmMemory = new WebAssembly.Memory({
     "initial": INITIAL_INITIAL_MEMORY / WASM_PAGE_SIZE,
-    "maximum": 1073741824 / WASM_PAGE_SIZE
+    "maximum": 1073741824 / WASM_PAGE_SIZE,
+    "shared": false
 })
 if (wasmMemory) {
-    buffer = wasmMemory.buffer
+    buffer = wasmMemory.buffer;
+    console.log(buffer);
 }
+
 INITIAL_INITIAL_MEMORY = buffer.byteLength;
 updateGlobalBufferAndViews(buffer);
 HEAP32[DYNAMICTOP_PTR >> 2] = DYNAMIC_BASE;
@@ -467,7 +470,7 @@ function createWasm() {
         receiveInstance(output)
     }
 
-    function instantiateAsync() {
+    function instantiateAsync() {      
         var wasmurl = (typeof Module["wasmurl"] == "string" && Module["wasmurl"] != '' ? Module["wasmurl"] : 'http://192.168.2.7:8080/opencv.wasm');
         var wasmfilename = wasmurl.slice(wasmurl.lastIndexOf("/") + 1);
         var USER_DATA_PATH = wx.env.USER_DATA_PATH;
@@ -489,20 +492,17 @@ function createWasm() {
             }
         } else {
             if (Module["wasmtype"] == "zip") {
-
                 try {
-                    FSM.accessSync(wasmdir + wasmfilename.slice(0, wasmfilename.lastIndexOf(".zip")) + ".wasm");
-                    //console.log("useCache");
+                    FSM.accessSync(wasmdir + wasmfilename.slice(0, wasmfilename.lastIndexOf(".zip")) + ".wasm");                
                     flag = false;
-                    var wasmdata = FSM.readFileSync(wasmdir + wasmfilename.slice(0, wasmfilename.lastIndexOf(".zip")) + ".wasm");
+                    var wasmdata = FSM.readFileSync(wasmdir + wasmfilename.slice(0, wasmfilename.lastIndexOf(".zip")) + ".wasm");                   
                     new WebAssembly.compile(wasmdata).then(function (wam) {
                         new WebAssembly.instantiate(wam, info).then(receiveInstantiatedSource);
                     });
                 } catch (error) {}
             } else {
                 try {
-                    FSM.accessSync(wasmdir + wasmfilename);
-                    //console.log("useCache");
+                    FSM.accessSync(wasmdir + wasmfilename);                 
                     flag = false;
                     var wasmdata = FSM.readFileSync(wasmdir + wasmfilename);
                     new WebAssembly.compile(wasmdata).then(function (wam) {
@@ -520,20 +520,26 @@ function createWasm() {
                         FSM.unzip({
                             zipFilePath: wasmzipfilepath,
                             targetPath: wasmdir,
-                            complete: function (res) {
+                            complete: function (res) { 
                                 var wasmdata = FSM.readFileSync(wasmdir + wasmfilename.slice(0, wasmfilename.lastIndexOf(".zip")) + ".wasm");
                                 new WebAssembly.compile(wasmdata).then(function (wam) {
                                     new WebAssembly.instantiate(wam, info).then(receiveInstantiatedSource);
                                 });
                             }
                         })
-                    } else {
+                    
+                    } else { 
                         var wasmfilepath = evt.tempFilePath;
                         FSM.saveFileSync(wasmfilepath, wasmdir + wasmfilename);
                         var wasmdata = FSM.readFileSync(wasmdir + wasmfilename);
+                        // WebAssembly.instantiateStreaming(wasmdata, info).then(receiveInstantiatedSource); 
+                      
+                      console.log("sssssssss");
+                               
                         new WebAssembly.compile(wasmdata).then(function (wam) {
                             new WebAssembly.instantiate(wam, info).then(receiveInstantiatedSource);
                         });
+                        console.log("666666666666");
                     }
                 }
             })

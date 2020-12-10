@@ -89,7 +89,8 @@ let initial_position = {
   x:0,
   y:0,
   width: 0,
-  height: 0
+  height: 0,
+  findFlag: false
 };
 
 
@@ -166,14 +167,15 @@ Page({
     let that = this;
     let wasmStart = Date.now();
     wasm.init({
-      url: "https://www.wechatvr.org/opencv/opencv.zip",
+      url: "https://www.wechatvr.org/opencvRealese/kcfAndLKHasShareProb/opencv.zip",
       type: "zip", //格式：wasm,zip
-      useCache: true, //是否使用缓存
+      useCache: false, //是否使用缓存
       self: this,
       success: function (Module) {
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
-        that.main();
+        console.log(cv.TrackerKCF);      
+        //that.main();
       }
     });
   },
@@ -311,10 +313,10 @@ Page({
         listener.start();
       }
     };
-    // if (dev.ifStartListen) {
-    //   listener.start();
-    // }
-    this.loadAnimation(animationUrl, startListen);
+    if (dev.ifStartListen) {
+      listener.start();
+    }
+    // this.loadAnimation(animationUrl, startListen);
   },
 
   /*需要用到cv的相关变量的定义*/
@@ -368,17 +370,33 @@ Page({
 
   orbAndLKTrack() {
     let that = this;
+    let startTime = Date.now();
+    let { frame } = cameraConfig;
+    let { currentFrame, currentGray } = currentFrameSet;
+
+    currentFrame.data.set(frame.data); //摄像机图像的Mat格式
+
     if (dev.onlyDetect) {
+
         that.findFeaturePoints();
+
     } else if(dev.ifOrbAndLK) {
+
+        cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化  
         if (flag_trackLK == 0) {
           that.findFeaturePoints(); //ORB找到初始角点
         } else {
           that.tracking_LK(); //特征点l-k跟踪
         }
+
     } else if(dev.ifOrbAndKCF) {
+
         if (flag_trackKCF == 0) {
-          that.findInitialPosition(); //ORB找到初始角点
+          res = that.findInitialPosition(startTime); //ORB找到初始角点
+          if(res[1]){        //如果找到了模板图的初始位置
+            let box = res[0];    //box中含有初始位置
+            that.tracking_KCF(box); //KCF跟踪           
+          }
         } else {
           that.tracking_KCF(); //特征点KCF跟踪
         }
@@ -425,9 +443,8 @@ Page({
 
 
     //得到实时帧的特征点和描述子    
-    currentFrame.data.set(frame.data); //摄像机图像的Mat格式
 
-    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
+    // cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
   
 
     if (1) {
@@ -582,9 +599,10 @@ Page({
     // currentFrame.delete();
   },
 
-  findInitialPosition: function(){
+  findInitialPosition: function(time){
+    
     dev.orb++;
-    let x, y, width, height;
+    let x, y, width, height, ifFindPosition = false;
     let {
       currentFrame,  
       currentGray,   
@@ -610,7 +628,7 @@ Page({
 
 
     //得到实时帧的特征点和描述子    
-    currentFrame.data.set(frame.data); //摄像机图像的Mat格式
+    // currentFrame.data.set(frame.data); //摄像机图像的Mat格式
 
     cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
   
@@ -619,7 +637,7 @@ Page({
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
       if (keyPoints.size() < 0.5 * feature_size) {
         console.log("info:keypoints is too few, return now...");    //特征点过少，返回
-        return;
+        return [{x, y, width, height}, ifFindPosition];
       }
       detector.compute(currentGray, keyPoints, descriptors); //得到描述子  
 
@@ -654,7 +672,7 @@ Page({
       if (tempImage_id == -1) {
         goodMatches.delete();
         cv.imshow(currentFrame);
-        return;
+        return [{x, y, width, height}, ifFindPosition]; 
       }
 
       // 从goodmatch匹配中获得分别获得相对应图像的关键点信息
@@ -708,8 +726,8 @@ Page({
             vertex[2] = vertex[4] = x_max;
             vertex[1] = vertex[3] = y_min;
             vertex[5] = vertex[7] = y_max;
+            ifFindPosition = true;
             draw_bounding_box(currentFrame, vertex, cv, "number"); // 画出识别区域四周边框
-
             cv.circle(currentFrame, {                    //画出中心点
               x: x,
               y: y
@@ -717,12 +735,12 @@ Page({
 
             cv.imshow(currentFrame);
             dev.ifRecognized = true;
-            
+            console.log(`耗时${Date.now()-time}ms`);
           }
         }
       }
     }
-    return {x, y, width, height};
+    return [{x, y, width, height}, ifFindPosition];
   },
 
   tracking_LK: function () {
@@ -731,8 +749,8 @@ Page({
       currentGray
     } = currentFrameSet;
 
-    currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
-    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化  
+    // currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
+    
 
 
     cv.calcOpticalFlowPyrLK(oldGray, currentGray, LK_pointOld, LK_pointNew, st, err, winSize, maxLevel, criteria);
@@ -742,7 +760,12 @@ Page({
   },
 
   tracking_KCF: function(){
+    //KCF跟踪代码
 
+    //更新跟踪标志位
+    if(0){       //如果跟踪成功，就更新标志位
+       flag_trackKCF = 1;
+    }   
   },
 
   calculate_transform_new: function () {
