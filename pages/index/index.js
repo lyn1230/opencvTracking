@@ -1,5 +1,7 @@
 const THREE = require("../../utils/three/three.weapp.min");
-const wasm = require("../../utils/wasm");
+const wasm = require("../../utils/opencv");
+
+
 const {
   fbxModelLoad
 } = require("../../utils/three/model");
@@ -143,6 +145,9 @@ let flag_trackLK = 0;
 
 //开启KCF跟踪标志位
 let flag_trackKCF = 0;
+let KCF = null;
+let isinit = false;   //KCF滤波器是否已经初始化好
+let box = null;
 
 // 产生随机颜色值
 let color = [];
@@ -159,6 +164,7 @@ Page({
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
     this.frameSizeInit(); //自动适配实时帧的宽高
+    console.log("dddddddddddd")
     this.getwasm(); //加载opencv.js，确保可以
   },
 
@@ -167,15 +173,14 @@ Page({
     let that = this;
     let wasmStart = Date.now();
     wasm.init({
-      url: "https://www.wechatvr.org/opencvRealese/kcfAndLKHasShareProb/opencv.zip",
+      url: "https://www.wechatvr.org/opencvRealese/originOpencv/opencv.zip",
       type: "zip", //格式：wasm,zip
       useCache: false, //是否使用缓存
       self: this,
       success: function (Module) {
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
-        console.log(cv.TrackerKCF);      
-        //that.main();
+        that.main();
       }
     });
   },
@@ -321,6 +326,7 @@ Page({
 
   /*需要用到cv的相关变量的定义*/
   varInit: function () {
+    cv.NORM_HAMMING = 6;
     // currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
     currentFrameSet.currentGray = new cv.Mat();
     currentFrameSet.detector = new cv.ORB(currentFrameSet.feature_size, 1.2, 1, 0);
@@ -332,6 +338,9 @@ Page({
     cameraConfig.newVertex = new cv.Mat();
     cameraConfig.oldVertex = new cv.Mat();
 
+
+    //KCF相关变量
+    KCF = new cv.TrackerKCF();
 
 
     //不知道放在哪里的变量
@@ -389,13 +398,14 @@ Page({
           that.tracking_LK(); //特征点l-k跟踪
         }
 
-    } else if(dev.ifOrbAndKCF) {
-
+    } else if (dev.ifOrbAndKCF) {
         if (flag_trackKCF == 0) {
           res = that.findInitialPosition(startTime); //ORB找到初始角点
           if(res[1]){        //如果找到了模板图的初始位置
-            let box = res[0];    //box中含有初始位置
-            that.tracking_KCF(box); //KCF跟踪           
+            let position = res[0];    //box中含有初始位置
+            box = new cv.Rect(position[0], position[1], position[2], position[3]);
+            that.KCF_init(box); //KCF滤波器初始化    
+            flag_trackKCF = 1;     
           }
         } else {
           that.tracking_KCF(); //特征点KCF跟踪
@@ -597,10 +607,9 @@ Page({
       }
     }
     // currentFrame.delete();
-  },
+  }, 
 
-  findInitialPosition: function(time){
-    
+  findInitialPosition: function(time){    
     dev.orb++;
     let x, y, width, height, ifFindPosition = false;
     let {
@@ -719,21 +728,21 @@ Page({
             let y_max = Math.max(newVertex.data32F[5], newVertex.data32F[7]);
             width = Math.abs(x_max - x_min);
             height = Math.abs(y_max - y_min);
-            x = x_min+0.5*width;
-            y = y_min+0.5*height;
+            x = x_min;
+            y = y_min;
             let vertex = [];
             vertex[0] = vertex[6] = x_min;
             vertex[2] = vertex[4] = x_max;
             vertex[1] = vertex[3] = y_min;
             vertex[5] = vertex[7] = y_max;
             ifFindPosition = true;
-            draw_bounding_box(currentFrame, vertex, cv, "number"); // 画出识别区域四周边框
-            cv.circle(currentFrame, {                    //画出中心点
-              x: x,
-              y: y
-            }, 5, color[0], -1);
+            // draw_bounding_box(currentFrame, vertex, cv, "number"); // 画出识别区域四周边框
+            // cv.circle(currentFrame, {                    //画出中心点
+            //   x: x,
+            //   y: y
+            // }, 5, color[0], -1);
 
-            cv.imshow(currentFrame);
+            // cv.imshow(currentFrame);
             dev.ifRecognized = true;
             console.log(`耗时${Date.now()-time}ms`);
           }
@@ -759,13 +768,38 @@ Page({
     // currentFrame.delete();
   },
 
-  tracking_KCF: function(){
+  KCF_init: function(box){
+    let {
+      currentFrame,
+      currentGray
+    } = currentFrameSet;
     //KCF跟踪代码
+    cv.cvtColor(currentFrame, currentGray, 3,1);
+    KCF.init(currentGray, box);
+  },
 
-    //更新跟踪标志位
-    if(0){       //如果跟踪成功，就更新标志位
-       flag_trackKCF = 1;
-    }   
+  tracking_KCF: function(){
+    let {
+      currentFrame,
+      currentGray
+    } = currentFrameSet;
+    //KCF跟踪代码
+    cv.cvtColor(currentFrame, currentGray, 3,1);
+      let startTime = Date.now();
+      let bool = KCF.update(currentGray, box);
+      console.log(`耗时${Date.now()-startTime}ms`);
+      if (!bool) {     //发生跟丢的情况
+        flag_trackKCF = 0;
+      }
+      console.log(KCF.box);	
+      let vertex = [];
+      vertex[0] = vertex[6] = KCF.box.x;
+      vertex[1] = vertex[3] = KCF.box.y;
+      vertex[2] = vertex[4] = KCF.box.x + KCF.box.width;
+      vertex[5] = vertex[7] = KCF.box.y + KCF.box.height;
+
+      draw_bounding_box(currentFrame, vertex, cv, "number");
+      cv.imshow(currentFrame);    
   },
 
   calculate_transform_new: function () {

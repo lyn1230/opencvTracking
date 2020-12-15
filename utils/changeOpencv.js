@@ -272,7 +272,7 @@ var INITIAL_INITIAL_MEMORY = 134217728;
 wasmMemory = new WebAssembly.Memory({
     "initial": INITIAL_INITIAL_MEMORY / WASM_PAGE_SIZE,
     "maximum": 1073741824 / WASM_PAGE_SIZE,
-    // "shared": true
+    "shared": true
 })
 if (wasmMemory) {
     buffer = wasmMemory.buffer;
@@ -297,7 +297,6 @@ function callRuntimeCallbacks(callbacks) {
                 Module["dynCall_vi"](func, callback.arg)
             }
         } else {
-            console.log(callback.arg);
             func(callback.arg === undefined ? null : callback.arg)
         }
     }
@@ -321,7 +320,7 @@ function preRun() {
     callRuntimeCallbacks(__ATPRERUN__)
 }
 
-function initRuntime() {   
+function initRuntime() {
     runtimeInitialized = true;
     if (!Module["noFSInit"] && !FS.init.initialized)
         FS.init();
@@ -460,9 +459,7 @@ function createWasm() {
     };
 
     function receiveInstance(instance, module) {
-        console.log("即将执行回掉函数");
         var exports = instance.exports;
-        console.log(instance);
         Module["asm"] = exports;
         removeRunDependency("wasm-instantiate")
     }
@@ -536,12 +533,12 @@ function createWasm() {
                         var wasmdata = FSM.readFileSync(wasmdir + wasmfilename);
                         // WebAssembly.instantiateStreaming(wasmdata, info).then(receiveInstantiatedSource); 
                       
-                      
+                      console.log("sssssssss");
                                
                         new WebAssembly.compile(wasmdata).then(function (wam) {
                             new WebAssembly.instantiate(wam, info).then(receiveInstantiatedSource);
                         });
-                        
+                        console.log("666666666666");
                     }
                 }
             })
@@ -3564,13 +3561,13 @@ function embind_init_charCodes() {
 var embind_charCodes = undefined;
 
 function readLatin1String(ptr) {
-    debugger;
-    console.log(HEAPU8);
+  debugger;
+  console.log(HEAPU8);
     var ret = "";
     var c = ptr;
     while (HEAPU8[c]) {
       let temp = HEAPU8[c];
-        ret += embind_charCodes[HEAPU8[c++]]
+      ret += embind_charCodes[HEAPU8[c++]]
     }
     return ret
 }
@@ -4165,9 +4162,8 @@ function replacePublicSymbol(name, value, numArguments) {
 }
 
 function embind__requireFunction(signature, rawFunction) {
-    console.log(signature);
     signature = readLatin1String(signature);
-    console.log(signature);
+
     function makeDynCaller(dynCall) {
         switch (signature.length) {
             case 1:
@@ -4286,6 +4282,8 @@ function embind__requireFunction(signature, rawFunction) {
         return DynCaller;
     }
     var dc = Module["dynCall_" + signature];
+    console.log(dc);
+    // debugger;
     var fp = makeDynCaller(dc);
     if (typeof fp !== "function") {
         throwBindingError("unknown function pointer with signature " + signature + ": " + rawFunction)
@@ -6574,19 +6572,15 @@ dependenciesFulfilled = function runCaller() {
 };
 
 function run(args) {
-    console.log("开始执行run");
     args = args || arguments_;
     if (runDependencies > 0) {
         return
     }
     preRun();
-    console.log("preRun");
-    if (runDependencies > 0){
-        console.log("runDependencies > 0");
+    if (runDependencies > 0)
         return;
-    }
 
-    function doRun() {       
+    function doRun() {
         if (calledRun)
             return;
         calledRun = true;
@@ -6602,7 +6596,6 @@ function run(args) {
         
     }
     if (Module["setStatus"]) {
-        console.log('Module["setStatus"]存在');
         Module["setStatus"]("Running...");
         setTimeout(function () {
             setTimeout(function () {
@@ -6611,10 +6604,8 @@ function run(args) {
             doRun()
         }, 1)
     } else {
-        console.log('Module["setStatus"]不存在');
         doRun()
     }
-    console.log("完毕执行run");
 }
 Module["run"] = run;
 if (Module["preInit"]) {
@@ -6939,10 +6930,8 @@ function init(args) {
     Module["wasmurl"] = args.url;
     Module["wasmtype"] = args.type ? args.type : "wasm";
     Module["useCache"] = args.useCache ? args.useCache : false;
-    console.log(typeof Module["asm"]["dynCall_iiiiiijj"] != "function");
     if (typeof Module["asm"]["dynCall_iiiiiijj"] != "function") {       
-        if (!Module["inited"]) {  
-            console.log("inited?");          
+        if (!Module["inited"]) {            
             wx.createSelectorQuery().select('#OffscreenCanvas').node(function (res) {
                 Module["canvas"] = res.node;
                 var dpr=1;
@@ -6960,10 +6949,8 @@ function init(args) {
         i++;
         setTimeout(init, 1);
     } else {
-        console.log(Module["asm"]);
         if (typeof args.success == "function") {
-            // args.success(Module);
-            console.log("回调函数");
+            args.success(Module);
         }
     }
 }
