@@ -779,13 +779,11 @@
         return Promise.resolve().then(getBinary);
       }
       function createWasm() {
-        console.log("createWasm执行");
         var info = {
           env: asmLibraryArg,
           wasi_snapshot_preview1: asmLibraryArg,
         };
         function receiveInstance(instance, module) {
-          console.log("即将执行回掉函数");
           var exports = instance.exports;
           Module["asm"] = exports;
           wasmTable = Module["asm"]["__indirect_function_table"];
@@ -815,7 +813,6 @@
         //             FSM.saveFileSync(wasmfilepath, wasmdir + wasmfilename);
         //             var wasmdata = FSM.readFileSync(wasmdir + wasmfilename);
         //             console.log(wasmdata);
-        //             debugger;
         //             new WebAssembly.compile(wasmdata).then(function (wam) {
         //                 return new WebAssembly.instantiate(wam, info).then(receiver);
         //             });
@@ -914,12 +911,10 @@
                   success(evt) {
                       if (Module["wasmtype"] == "zip") {
                           var wasmzipfilepath = evt.tempFilePath;
-                          console.log("unzip");
                           FSM.unzip({
                               zipFilePath: wasmzipfilepath,
                               targetPath: wasmdir,
                               complete: function (res) { 
-                                console.log("complete");
                                   var wasmdata = FSM.readFileSync(wasmdir + wasmfilename.slice(0, wasmfilename.lastIndexOf(".zip")) + ".wasm");
                                   new WebAssembly.compile(wasmdata).then(function (wam) {                                   
                                       new WebAssembly.instantiate(wam, info).then(receiveInstantiatedSource);
@@ -951,7 +946,6 @@
           }
         }
         instantiateAsync();
-        console.log("retrun");
         return {};
       }
       var tempDouble;
@@ -5763,9 +5757,7 @@
         };
       }
       function embind__requireFunction(signature, rawFunction) {
-        console.log(signature);
         signature = readLatin1String(signature);
-        console.log(signature);
         // function makeDynCaller(dynCall) {
         //     switch (signature.length) {
         //         case 1:
@@ -8312,7 +8304,6 @@
       // var asm = createWasm();
       var ___wasm_call_ctors = (Module["___wasm_call_ctors"] = function () {
 
-        console.log(Module["asm"]);
         return (___wasm_call_ctors = Module["___wasm_call_ctors"] =
           Module["asm"]["__wasm_call_ctors"]).apply(null, arguments);
       });
@@ -8426,14 +8417,11 @@
         if (!calledRun) dependenciesFulfilled = runCaller;
       };
       function run(args) {
-        console.log("开始执行run");
-        // debugger;
         args = args || arguments_;
         if (runDependencies > 0) {
           return;
         }
         preRun();
-        console.log("preRun");
         if (runDependencies > 0){
           console.log("runDependencies > 0");
           return;
@@ -8460,10 +8448,8 @@
             doRun();
           }, 1);
         } else {
-          console.log('Module["setStatus"]不存在');
           doRun();
         }
-        console.log("执行完毕run");
       }
       Module["run"] = run;
       if (Module["preInit"]) {
@@ -8813,12 +8799,9 @@ function init(args) {
         }
     }
 
-    // Module["FS"] = FS;
     Module["wasmurl"] = args.url;
     Module["wasmtype"] = args.type ? args.type : "wasm";
     Module["useCache"] = args.useCache ? args.useCache : false;
-    // debugger;
-    console.log(typeof Module["asm"]["dynCall_iiiiiijj"] != "function");
     if (typeof Module["asm"]["dynCall_iiiiiijj"] != "function") {       
         if (!Module["inited"]) {            
             wx.createSelectorQuery().select('#OffscreenCanvas').node(function (res) {
@@ -8829,10 +8812,8 @@ function init(args) {
                 Module["canvas"].height=res.node._height*dpr;
                 Module["canvascontext"]=Module["canvas"].getContext("2d");
                 Module["canvascontext"].scale(dpr,dpr);
-            }).exec();
-            console.log("createWasm之前");            
+            }).exec();       
             asm = createWasm();
-            console.log("createWasm完成");
             run();
             Module["inited"] = true;
             Module["args"] = args;
@@ -8841,29 +8822,10 @@ function init(args) {
         setTimeout(init, 1);
     } else {
         if (typeof args.success == "function") {
-          console.log("回调函数");
             args.success(Module);
         }
     }
 }
-
-
-// init({
-//   url: "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip",
-//   type: "zip", //格式：wasm,zip
-//   useCache: false, //是否使用缓存
-//   self: this,
-//   success: function (Module) {
-//     // alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
-//     cv = Module;
-//     // let KCF = new cv.TrackerKCF();
-//     // let kal = new cv.KalmanFilter();
-//     console.log(cv);  
-//     debugger;
-//     // console.log(kal);           
-//     //that.main();
-//   }
-// });
 
 module.exports = {
   Module: Module,

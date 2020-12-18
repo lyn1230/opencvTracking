@@ -4165,9 +4165,7 @@ function replacePublicSymbol(name, value, numArguments) {
 }
 
 function embind__requireFunction(signature, rawFunction) {
-    console.log(signature);
     signature = readLatin1String(signature);
-    console.log(signature);
     function makeDynCaller(dynCall) {
         switch (signature.length) {
             case 1:
@@ -6962,8 +6960,7 @@ function init(args) {
     } else {
         console.log(Module["asm"]);
         if (typeof args.success == "function") {
-            // args.success(Module);
-            console.log("回调函数");
+            args.success(Module);
         }
     }
 }

@@ -67,7 +67,7 @@ const templateImage = {
 let dev = {
   ifStartListen: true, //是否开启监听器
   image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
-  frameCount: 500, //识别几帧之后停止下一帧的获取
+  frameCount: 200, //识别几帧之后停止下一帧的获取
   ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
   orb: 0, //使用了几次orb的方法（l-k几次跟丢）
   onlyDetect: false,    //是否只使用detect的方案
@@ -164,7 +164,6 @@ Page({
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
     this.frameSizeInit(); //自动适配实时帧的宽高
-    console.log("dddddddddddd")
     this.getwasm(); //加载opencv.js，确保可以
   },
 
@@ -307,7 +306,6 @@ Page({
       }      
      
       that.handleFrame(); 
-
       performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
     });
     startListen = function (resModel) {
@@ -327,6 +325,10 @@ Page({
   /*需要用到cv的相关变量的定义*/
   varInit: function () {
     cv.NORM_HAMMING = 6;
+    cv.COLOR_RGB2GRAY = 7;
+    cv.NORM_HAMMING = 6;
+    cv.COLOR_RGBA2GRAY = 11;
+    cv.RANSAC = 8;
     // currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
     currentFrameSet.currentGray = new cv.Mat();
     currentFrameSet.detector = new cv.ORB(currentFrameSet.feature_size, 1.2, 1, 0);
@@ -403,7 +405,8 @@ Page({
           res = that.findInitialPosition(startTime); //ORB找到初始角点
           if(res[1]){        //如果找到了模板图的初始位置
             let position = res[0];    //box中含有初始位置
-            box = new cv.Rect(position[0], position[1], position[2], position[3]);
+            box = new cv.Rect(position.x, position.y, position.width, position.height);
+            console.log(box);          
             that.KCF_init(box); //KCF滤波器初始化    
             flag_trackKCF = 1;     
           }
@@ -774,7 +777,7 @@ Page({
       currentGray
     } = currentFrameSet;
     //KCF跟踪代码
-    cv.cvtColor(currentFrame, currentGray, 3,1);
+    cv.cvtColor(currentFrame, currentGray, 1, 3);
     KCF.init(currentGray, box);
   },
 
@@ -784,10 +787,10 @@ Page({
       currentGray
     } = currentFrameSet;
     //KCF跟踪代码
-    cv.cvtColor(currentFrame, currentGray, 3,1);
+    cv.cvtColor(currentFrame, currentGray, 1,3);
       let startTime = Date.now();
       let bool = KCF.update(currentGray, box);
-      console.log(`耗时${Date.now()-startTime}ms`);
+      console.log(`KCF耗时${Date.now()-startTime}ms`);
       if (!bool) {     //发生跟丢的情况
         flag_trackKCF = 0;
       }
@@ -799,7 +802,9 @@ Page({
       vertex[5] = vertex[7] = KCF.box.y + KCF.box.height;
 
       draw_bounding_box(currentFrame, vertex, cv, "number");
-      cv.imshow(currentFrame);    
+      console.log("KCF跟踪&&绘制识别框耗时：", Date.now()-startTime); 
+      cv.imshow(currentFrame);  
+      console.log("KCF跟踪&&绘制识别框&&展示图像耗时：", Date.now()-startTime);  
   },
 
   calculate_transform_new: function () {
