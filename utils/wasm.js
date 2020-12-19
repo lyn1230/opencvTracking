@@ -15,7 +15,8 @@ var thisProgram = "./this.program";
 var ENVIRONMENT_IS_NODE = true;
 
 var wasmMemory;
-var wasmTable = new WebAssembly.Table({
+var wasmTable;
+var wasmTableDalao = new WebAssembly.Table({
     "initial": 9160,
     "maximum": 9160 + 0,
     "element": "anyfunc"
@@ -272,7 +273,7 @@ var INITIAL_INITIAL_MEMORY = 134217728;
 wasmMemory = new WebAssembly.Memory({
     "initial": INITIAL_INITIAL_MEMORY / WASM_PAGE_SIZE,
     "maximum": 1073741824 / WASM_PAGE_SIZE,
-    // "shared": true
+    "shared": true
 })
 if (wasmMemory) {
     buffer = wasmMemory.buffer;
@@ -464,6 +465,7 @@ function createWasm() {
         var exports = instance.exports;
         console.log(instance);
         Module["asm"] = exports;
+        wasmTable = Module["asm"]["__indirect_function_table"];
         removeRunDependency("wasm-instantiate")
     }
     addRunDependency("wasm-instantiate");
@@ -3564,9 +3566,7 @@ function embind_init_charCodes() {
 var embind_charCodes = undefined;
 
 function readLatin1String(ptr) {
-    debugger;
-    console.log(HEAPU8);
-    var ret = "";
+ var ret = "";
     var c = ptr;
     while (HEAPU8[c]) {
       let temp = HEAPU8[c];
@@ -4166,123 +4166,131 @@ function replacePublicSymbol(name, value, numArguments) {
 
 function embind__requireFunction(signature, rawFunction) {
     signature = readLatin1String(signature);
-    function makeDynCaller(dynCall) {
-        switch (signature.length) {
-            case 1:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1) {
-                        return dynCall(rawFunction, a1);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 2:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2) {
-                        return dynCall(rawFunction, a1, a2);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 3:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3) {
-                        return dynCall(rawFunction, a1, a2, a3);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 4:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4) {
-                        return dynCall(rawFunction, a1, a2, a3, a4);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 5:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 6:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 7:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 8:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 9:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 10:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 11:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 12:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 13:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
-            case 14:
-                var DynCaller = function (dynCall, rawFunction) {
-                    this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14) {
-                        return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
-                    };
-                    return this["dynCall_" + signature + "_" + rawFunction];
-                }(dynCall, rawFunction);
-                break;
+    // function makeDynCaller(dynCall) {
+    //     switch (signature.length) {
+    //         case 1:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1) {
+    //                     return dynCall(rawFunction, a1);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 2:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2) {
+    //                     return dynCall(rawFunction, a1, a2);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 3:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3) {
+    //                     return dynCall(rawFunction, a1, a2, a3);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 4:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 5:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 6:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 7:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 8:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 9:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 10:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 11:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 12:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 13:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //         case 14:
+    //             var DynCaller = function (dynCall, rawFunction) {
+    //                 this["dynCall_" + signature + "_" + rawFunction] = function (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14) {
+    //                     return dynCall(rawFunction, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+    //                 };
+    //                 return this["dynCall_" + signature + "_" + rawFunction];
+    //             }(dynCall, rawFunction);
+    //             break;
+    //     }
+    //     return DynCaller;
+    // }
+
+    function makeDynCaller() {
+        if (signature.indexOf("j") != -1) {
+          return getDynCaller(signature, rawFunction);
         }
-        return DynCaller;
-    }
+        return wasmTable.get(rawFunction);
+      }
+
     var dc = Module["dynCall_" + signature];
     var fp = makeDynCaller(dc);
     if (typeof fp !== "function") {
@@ -6937,7 +6945,6 @@ function init(args) {
     Module["wasmurl"] = args.url;
     Module["wasmtype"] = args.type ? args.type : "wasm";
     Module["useCache"] = args.useCache ? args.useCache : false;
-    console.log(typeof Module["asm"]["dynCall_iiiiiijj"] != "function");
     if (typeof Module["asm"]["dynCall_iiiiiijj"] != "function") {       
         if (!Module["inited"]) {  
             console.log("inited?");          

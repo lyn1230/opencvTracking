@@ -465,6 +465,88 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
 
 }
 
+
+let modelPoseUpdateKCF = function (newBB, w, h, modelSize, model, cv) {
+  var marker_corner = [{
+    'x': newBB[0],
+    'y': newBB[1]
+  }, {
+    'x': newBB[2],
+    'y': newBB[3]
+  }, {
+    'x': newBB[4],
+    'y': newBB[5]
+  }, {
+    'x': newBB[6],
+    'y': newBB[7]
+  }];
+
+  let pose = pose_estimate(marker_corner, w, h, modelSize);
+
+  // let euler1 = rot_toeuler(pose.rotation1);
+  // let euler2 = rot_toeuler(pose.rotation2);
+
+  // if (Math.abs(pose.error1 / pose.error2) > 0.8) {
+  //   let distance1 = Math.abs(euler1.x - originalRotation.x) + Math.abs(euler1.y - originalRotation.y) + Math.abs(euler1.z - originalRotation.z);
+  //   let distance2 = Math.abs(euler2.x - originalRotation.x) + Math.abs(euler2.y - originalRotation.y) + Math.abs(euler2.z - originalRotation.z);
+  //   if (distance1 < distance2) {
+  //     originalRotation = euler1;
+  //     // console.log("选择了euler1,error1:", pose.error1);
+  //   } else {
+  //     originalRotation = euler2;
+  //     // console.log("选择了euler2,error2:", pose.error2);
+  //   }
+  // } else {
+  //   // console.log("选择了euler1,error1:", pose.error1);
+  //   originalRotation = euler1;
+  // }
+  // // console.log("originalRotation:", originalRotation);
+
+  // let translation_estimated = new cv.Mat(3, 1, cv.CV_64FC1);
+  // let rotation_estimated = new cv.Mat(3, 3, cv.CV_64FC1);
+
+  // updateKalmanFilter(KF, pose.translation, originalRotation, translation_estimated, rotation_estimated);
+  // console.log(translation_estimated);
+
+  // model.scale.x = 0;
+  // model.scale.y = 0;
+  // model.scale.z = 0;
+
+  /*角度估计*/
+  //卡尔曼滤波估计
+  // model.rotation.x = rotation_estimated.data64F[0];
+  // model.rotation.y = rotation_estimated.data64F[1];
+  // model.rotation.z = rotation_estimated.data64F[2];
+  //原始角度
+  // model.rotation.x = 0;
+  // model.rotation.y = 0;
+  // model.rotation.z = 0;
+
+  // console.log(pose.translation);
+
+  /*位移估计*/
+  //卡尔曼滤波估计
+  //model.position.x = translation_estimated.data64F[0];
+  //model.position.y = translation_estimated.data64F[1];
+  //model.position.z = -translation_estimated.data64F[2];
+  //原始位移
+
+  model.position.x = pose.translation[0];
+  model.position.y = pose.translation[1];
+  model.position.z = -pose.translation[2];
+
+
+  //测试
+  // a++;
+  // model.position.x = a;
+
+
+
+
+
+
+}
+
 module.exports = {
   alertMini: showToast,
   init_originalFrameInfo: initOriginalFrameInfo,
@@ -477,5 +559,6 @@ module.exports = {
   init_smoothBBArray: initSmoothBBArray,
   window_smooth: windowSmooth,
   performance_monitoring: performanceMonitoring,
-  model_poseUpdate: modelPoseUpdate
+  model_poseUpdate: modelPoseUpdate,
+  model_poseUpdateKCF: modelPoseUpdateKCF
 };

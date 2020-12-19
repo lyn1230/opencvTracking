@@ -1,5 +1,5 @@
 const THREE = require("../../utils/three/three.weapp.min");
-const wasm = require("../../utils/opencv");
+const wasm = require("../../utils/wasm");
 
 
 const {
@@ -19,7 +19,8 @@ const {
   init_smoothBBArray,
   window_smooth,
   performance_monitoring,
-  model_poseUpdate
+  model_poseUpdate,
+  model_poseUpdateKCF
 } = require("../../utils/util");
 var cv;
 var listener;
@@ -146,6 +147,7 @@ let flag_trackLK = 0;
 //开启KCF跟踪标志位
 let flag_trackKCF = 0;
 let KCF = null;
+let notFindKCF = 0;
 let isinit = false;   //KCF滤波器是否已经初始化好
 let box = null;
 
@@ -172,7 +174,8 @@ Page({
     let that = this;
     let wasmStart = Date.now();
     wasm.init({
-      url: "https://www.wechatvr.org/opencvRealese/originOpencv/opencv.zip",
+      // url: "https://www.wechatvr.org/opencvRealese/originOpencv/opencv.zip",
+      url: "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip",
       type: "zip", //格式：wasm,zip
       useCache: false, //是否使用缓存
       self: this,
@@ -316,10 +319,10 @@ Page({
         listener.start();
       }
     };
-    if (dev.ifStartListen) {
-      listener.start();
-    }
-    // this.loadAnimation(animationUrl, startListen);
+    // if (dev.ifStartListen) {
+    //   listener.start();
+    // }
+    this.loadAnimation(animationUrl, startListen);
   },
 
   /*需要用到cv的相关变量的定义*/
@@ -405,8 +408,7 @@ Page({
           res = that.findInitialPosition(startTime); //ORB找到初始角点
           if(res[1]){        //如果找到了模板图的初始位置
             let position = res[0];    //box中含有初始位置
-            box = new cv.Rect(position.x, position.y, position.width, position.height);
-            console.log(box);          
+            box = new cv.Rect(position.x, position.y, position.width, position.height);      
             that.KCF_init(box); //KCF滤波器初始化    
             flag_trackKCF = 1;     
           }
@@ -746,7 +748,6 @@ Page({
             // }, 5, color[0], -1);
 
             // cv.imshow(currentFrame);
-            dev.ifRecognized = true;
             console.log(`耗时${Date.now()-time}ms`);
           }
         }
@@ -763,10 +764,10 @@ Page({
 
     // currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
     
-
+    let time = Date.now();
 
     cv.calcOpticalFlowPyrLK(oldGray, currentGray, LK_pointOld, LK_pointNew, st, err, winSize, maxLevel, criteria);
-
+    console.log("lk耗时：", Date.now()-time);
     this.calculate_transform_new();
     // currentFrame.delete();
   },
@@ -791,24 +792,32 @@ Page({
       let startTime = Date.now();
       let bool = KCF.update(currentGray, box);
       console.log(`KCF耗时${Date.now()-startTime}ms`);
-      if (!bool) {     //发生跟丢的情况
-        flag_trackKCF = 0;
+      if(!bool){
+        notFindKCF++;
+        if(notFindKCF > 5){   //bool值为false达到5次，视为跟丢
+          flag_trackKCF = 0;
+          notFindKCF = 0;
+          return;
+        }
       }
-      console.log(KCF.box);	
       let vertex = [];
       vertex[0] = vertex[6] = KCF.box.x;
       vertex[1] = vertex[3] = KCF.box.y;
       vertex[2] = vertex[4] = KCF.box.x + KCF.box.width;
       vertex[5] = vertex[7] = KCF.box.y + KCF.box.height;
-
-      draw_bounding_box(currentFrame, vertex, cv, "number");
-      console.log("KCF跟踪&&绘制识别框耗时：", Date.now()-startTime); 
+      model_poseUpdateKCF(vertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, model, cv);
+      dev.ifRecognized = true;    //跟踪到了模板图，更新性能测试指标
+      // console.log(KCF.box);	
+      cv.circle(currentFrame, {
+        x: (KCF.box.x + 0.5*(KCF.box.width)),
+        y: (KCF.box.y + 0.5*(KCF.box.height)),
+      }, 5, new cv.Scalar(0, 0, 255, 255), -1);
       cv.imshow(currentFrame);  
-      console.log("KCF跟踪&&绘制识别框&&展示图像耗时：", Date.now()-startTime);  
+      console.log("KCF跟踪&&绘制中心点&&展示图像耗时：", Date.now()-startTime);  
   },
 
   calculate_transform_new: function () {
-
+    let startTime = Date.now(); 
     let {
       newVertex,
       oldVertex
@@ -892,13 +901,14 @@ Page({
             newVertex = window_smooth(smoothBBArray, newVertex, cv);
             //                            console.log("new:",newBB.data32F[0],newBB.data32F[1]);
           }
+          console.log("光流跟踪耗时：", Date.now()-startTime);
 
 
-          draw_bounding_box(currentFrame, newVertex, cv);
+          // draw_bounding_box(currentFrame, newVertex, cv);
           dev.ifRecognized = true;
 
           //进行模型渲染
-          model_poseUpdate(newVertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, originalRotation, model, cv);
+          // model_poseUpdate(newVertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, originalRotation, model, cv);
 
           /* // 画出特征匹配结果
            drawMatches1(originalFrameArray[flag_index], newFrame, goodOrigin, goodNew, grayMatchingImage, color, good_cnt, originalBBArray[flag_index], newBB);
@@ -921,13 +931,16 @@ Page({
             //      return;
             //  }
 
-            cv.circle(currentFrame, {
-              x: goodNew.data32F[2 * i],
-              y: goodNew.data32F[2 * i + 1]
-            }, 5, color[0], -1);
+            // cv.circle(currentFrame, {
+            //   x: goodNew.data32F[2 * i],
+            //   y: goodNew.data32F[2 * i + 1]
+            // }, 5, color[0], -1);
           }
           // cv.add(currentFrame, mask, currentFrame);
+          let start = Date.now();
           cv.imshow(currentFrame);
+          console.log("imshow耗时：", Date.now()-start);
+          console.log("光流跟踪+绘制识别框耗时：", Date.now()-startTime);
 
 
           // 更新各个所需变量

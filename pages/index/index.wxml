@@ -4,9 +4,9 @@
 <canvas id="OffscreenCanvas" type="2d" class="canvasClass" disable-scroll="true">
 </canvas>
 
-<!-- <canvas type="webgl" id="myCanvas" class="animaionClass"
+<canvas type="webgl" id="myCanvas" class="animaionClass"
 bindtouchstart="touchStart" bindtouchmove="touchMove" bindtouchend="touchEnd"
-></canvas> -->
+></canvas>
 
 <!-- <video src="https://www.wechatvr.org/banner.mp4" muted controls="false" show-play-btn="false"
 	show-center-play-btn="false" loop autoplay></video> -->
