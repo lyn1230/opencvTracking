@@ -865,7 +865,8 @@
 
 
         function instantiateAsync() {
-          var wasmurl = "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip";
+          // var wasmurl = "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip";
+          var wasmurl = "https://www.wechatvr.org/opencvRealese/fHog_C/opencv_js.zip";
           var wasmfilename = wasmurl.slice(wasmurl.lastIndexOf("/") + 1);
           var USER_DATA_PATH = wx.env.USER_DATA_PATH;
           var wasmdir = USER_DATA_PATH + "/wasm/";
@@ -8712,6 +8713,7 @@
       }
       Module["TermCriteria"] = TermCriteria;
       Module["matFromArray"] = function (rows, cols, type, array) {
+        var cv = Module;
         var mat = new cv.Mat(rows, cols, type);
         switch (type) {
           case cv.CV_8U:

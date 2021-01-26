@@ -1,5 +1,6 @@
+console.log("ddd");
 const THREE = require("../../utils/three/three.weapp.min");
-const wasm = require("../../utils/wasm");
+const wasm = require("../../utils/opencv");
 
 
 const {
@@ -68,7 +69,7 @@ const templateImage = {
 let dev = {
   ifStartListen: true, //是否开启监听器
   image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
-  frameCount: 200, //识别几帧之后停止下一帧的获取
+  frameCount: 500, //识别几帧之后停止下一帧的获取
   ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
   orb: 0, //使用了几次orb的方法（l-k几次跟丢）
   onlyDetect: false,    //是否只使用detect的方案
@@ -165,8 +166,8 @@ Page({
 
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
-    this.frameSizeInit(); //自动适配实时帧的宽高
-    this.getwasm(); //加载opencv.js，确保可以
+    // this.frameSizeInit(); //自动适配实时帧的宽高
+    // this.getwasm(); //加载opencv.js，确保可以
   },
 
   //事件处理函数console.log();
@@ -174,15 +175,16 @@ Page({
     let that = this;
     let wasmStart = Date.now();
     wasm.init({
-      // url: "https://www.wechatvr.org/opencvRealese/originOpencv/opencv.zip",
-      url: "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip",
+      url: "https://www.wechatvr.org/opencvRealese/fHog_C/opencv_js.zip",
+      // url: "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip",
       type: "zip", //格式：wasm,zip
       useCache: false, //是否使用缓存
       self: this,
       success: function (Module) {
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
-        that.main();
+        console.log(cv);
+        // that.main();
       }
     });
   },
@@ -805,7 +807,11 @@ Page({
       vertex[1] = vertex[3] = KCF.box.y;
       vertex[2] = vertex[4] = KCF.box.x + KCF.box.width;
       vertex[5] = vertex[7] = KCF.box.y + KCF.box.height;
+
+      let timeTemp = Date.now()      
       model_poseUpdateKCF(vertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, model, cv);
+      console.log("更改模型位置耗时：", Date.now()-timeTemp);
+      
       dev.ifRecognized = true;    //跟踪到了模板图，更新性能测试指标
       // console.log(KCF.box);	
       cv.circle(currentFrame, {
@@ -908,7 +914,7 @@ Page({
           dev.ifRecognized = true;
 
           //进行模型渲染
-          // model_poseUpdate(newVertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, originalRotation, model, cv);
+          model_poseUpdate(newVertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, originalRotation, model, cv);
 
           /* // 画出特征匹配结果
            drawMatches1(originalFrameArray[flag_index], newFrame, goodOrigin, goodNew, grayMatchingImage, color, good_cnt, originalBBArray[flag_index], newBB);
