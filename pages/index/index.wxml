@@ -1,5 +1,5 @@
 <view class="container">
-	<camera frame-size="small" device-position="back" class="cameraClass">defsd</camera>
+	<camera frame-size="small" device-position="back" class="cameraClass"></camera>
 </view>
 <canvas id="OffscreenCanvas" type="2d" class="canvasClass" disable-scroll="true">
 </canvas>

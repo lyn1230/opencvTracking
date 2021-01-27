@@ -69,7 +69,7 @@ const templateImage = {
 let dev = {
   ifStartListen: true, //是否开启监听器
   image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
-  frameCount: 500, //识别几帧之后停止下一帧的获取
+  frameCount: 10000, //识别几帧之后停止下一帧的获取
   ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
   orb: 0, //使用了几次orb的方法（l-k几次跟丢）
   onlyDetect: false,    //是否只使用detect的方案
@@ -160,14 +160,13 @@ let color = [];
 
 
 Page({
-  data: {
-    
+  data: {    
   },
 
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
-    // this.frameSizeInit(); //自动适配实时帧的宽高
-    // this.getwasm(); //加载opencv.js，确保可以
+    this.frameSizeInit(); //自动适配实时帧的宽高
+    this.getwasm(); //加载opencv.js，确保可以
   },
 
   //事件处理函数console.log();
@@ -175,7 +174,7 @@ Page({
     let that = this;
     let wasmStart = Date.now();
     wasm.init({
-      url: "https://www.wechatvr.org/opencvRealese/fHog_C/opencv_js.zip",
+      url: "https://www.wechatvr.org/opencvRealese/testTHQ_20210127/opencv_js.zip",
       // url: "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip",
       type: "zip", //格式：wasm,zip
       useCache: false, //是否使用缓存
@@ -184,111 +183,11 @@ Page({
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
         console.log(cv);
-        // that.main();
+        that.main();
       }
     });
   },
 
-  getcamera: function () {
-    var self = this;
-    if (!this.facexmlflag) {
-      this.facexmlflag = true;
-      wx.downloadFile({
-        url: 'http://www.aiotforest.com/haarcascade_frontalface_default.xml',
-        filePath: cv.USER_DATA_PATH + "/haarcascade_frontalface_default.xml",
-        success: function () {
-          self.faceflag = true;
-        }
-      })
-    }
-    if (!this.eyesxmlflag) {
-      this.eyesxmlflag = true;
-      wx.downloadFile({
-        url: 'http://www.aiotforest.com/haarcascade_eye.xml',
-        filePath: cv.USER_DATA_PATH + "/haarcascade_eye.xml",
-        success: function () {
-          self.eyesflag = true;
-        }
-      })
-    }
-    if (this.faceflag && this.eyesflag) {
-      cv.FS_createDataFile("/", "haarcascade_frontalface_default.xml", new Uint8Array(cv.FSM.readFileSync(cv.USER_DATA_PATH + "haarcascade_frontalface_default.xml")), true, false, undefined);
-      self.faceCascade = new cv.CascadeClassifier();
-      self.faceCascade.load("/haarcascade_frontalface_default.xml");
-
-      cv.FS_createDataFile("/", "haarcascade_eye.xml", new Uint8Array(cv.FSM.readFileSync(cv.USER_DATA_PATH + "haarcascade_eye.xml")), true, false, undefined);
-      self.eyesCascade = new cv.CascadeClassifier();
-      self.eyesCascade.load("/haarcascade_eye.xml");
-
-      const context = wx.createCameraContext()
-      listener = context.onCameraFrame((frame) => {
-        self.cameraData = frame;
-      })
-      listener.start();
-      self.detectloop();
-    } else {
-      setTimeout(this.getcamera, 100);
-    }
-  },
-  facexmlflag: false,
-  eyesxmlflag: false,
-  faceflag: false,
-  eyesflag: false,
-  cameraData: undefined,
-  detectloop: function () {
-    var self = this;
-    if (typeof self.cameraData == "object") {
-      self.detectFace(self.cameraData);
-      setTimeout(self.detectloop, 0);
-    } else {
-      setTimeout(self.detectloop, 100);
-    }
-  },
-
-  detectFace: function (frame) {
-    var self = this;
-    var src = new cv.Mat(frame.height, frame.width, cv.CV_8UC4);
-    src.data.set(new Uint8ClampedArray(frame.data));
-    // var src = cv.matFromImageData({
-    //   data: new Uint8ClampedArray(frame.data),
-    //   width: frame.width,
-    //   height: frame.height
-    // });
-    // var gray = new cv.Mat();
-    // cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-    // var faces = new cv.RectVector();
-    // let eyes = new cv.RectVector();
-    // var faceCascade = self.faceCascade;
-    // faceCascade.detectMultiScale(gray, faces, 1.1, 5, 0);
-    // for (var i = 0; i < faces.size(); ++i) {
-    //   var roiGray = gray.roi(faces.get(i));
-    //   var roiSrc = src.roi(faces.get(i));
-    //   var point1 = new cv.Point(faces.get(i).x, faces.get(i).y);
-    //   var point2 = new cv.Point(faces.get(i).x + faces.get(i).width,
-    //     faces.get(i).y + faces.get(i).height);
-    //   cv.rectangle(src, point1, point2, [255, 0, 0, 255]);
-
-    //   var eyesCascade = self.eyesCascade;
-    //   eyesCascade.detectMultiScale(roiGray, eyes);
-    //   for (let j = 0; j < eyes.size(); ++j) {
-    //     let point1 = new cv.Point(eyes.get(j).x, eyes.get(j).y);
-    //     let point2 = new cv.Point(eyes.get(j).x + eyes.get(j).width,
-    //       eyes.get(j).y + eyes.get(j).height);
-    //     cv.rectangle(roiSrc, point1, point2, [0, 0, 255, 255]);
-    //   }
-
-    //   roiGray.delete();
-    //   roiSrc.delete();
-    // }
-    cv.imshow(src);
-    src.delete();
-    // gray.delete();
-    // faces.delete();
-  },
-
-  stop: function () {
-    listener.stop();
-  },
 
   main: async function () {
     let that = this;
@@ -347,8 +246,10 @@ Page({
 
 
     //KCF相关变量
-    KCF = new cv.TrackerKCF();
-
+    KCF = new cv.FDSSTTracker(true, true, true, true);  //是否使用fHOG特征，是否固定大小，[]，是否使用lab特征
+    KCF.scale_step = 1.05;
+    KCF.scale_lr = 0.03;
+    KCF.interp_factor = 0.02;
 
     //不知道放在哪里的变量
     LK_pointOld = new cv.Mat();
@@ -414,6 +315,13 @@ Page({
             that.KCF_init(box); //KCF滤波器初始化    
             flag_trackKCF = 1;     
           }
+         
+         
+            
+            // box = new cv.Rect(83.9,84.2,148,146);      
+            // that.KCF_init(box); //KCF滤波器初始化    
+            // flag_trackKCF = 1;     
+          
         } else {
           that.tracking_KCF(); //特征点KCF跟踪
         }
@@ -653,6 +561,7 @@ Page({
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
       if (keyPoints.size() < 0.5 * feature_size) {
         console.log("info:keypoints is too few, return now...");    //特征点过少，返回
+        cv.imshow(currentFrame);
         return [{x, y, width, height}, ifFindPosition];
       }
       detector.compute(currentGray, keyPoints, descriptors); //得到描述子  
@@ -780,8 +689,9 @@ Page({
       currentGray
     } = currentFrameSet;
     //KCF跟踪代码
-    cv.cvtColor(currentFrame, currentGray, 1, 3);
+    cv.cvtColor(currentFrame, currentGray, 11);
     KCF.init(currentGray, box);
+    
   },
 
   tracking_KCF: function(){
@@ -790,11 +700,11 @@ Page({
       currentGray
     } = currentFrameSet;
     //KCF跟踪代码
-    cv.cvtColor(currentFrame, currentGray, 1,3);
+    cv.cvtColor(currentFrame, currentGray, 11);
       let startTime = Date.now();
-      let bool = KCF.update(currentGray, box);
+      let roi = KCF.update(currentGray);
       console.log(`KCF耗时${Date.now()-startTime}ms`);
-      if(!bool){
+      if(0){   //!bool
         notFindKCF++;
         if(notFindKCF > 5){   //bool值为false达到5次，视为跟丢
           flag_trackKCF = 0;
@@ -803,21 +713,27 @@ Page({
         }
       }
       let vertex = [];
-      vertex[0] = vertex[6] = KCF.box.x;
-      vertex[1] = vertex[3] = KCF.box.y;
-      vertex[2] = vertex[4] = KCF.box.x + KCF.box.width;
-      vertex[5] = vertex[7] = KCF.box.y + KCF.box.height;
+      vertex[0] = vertex[6] = roi.x;
+      vertex[1] = vertex[3] = roi.y;
+      vertex[2] = vertex[4] = roi.x + roi.width;
+      vertex[5] = vertex[7] = roi.y + roi.height;
 
       let timeTemp = Date.now()      
       model_poseUpdateKCF(vertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, model, cv);
       console.log("更改模型位置耗时：", Date.now()-timeTemp);
       
       dev.ifRecognized = true;    //跟踪到了模板图，更新性能测试指标
+      let {x, y, width, height} = roi;
+      let newFdsstVertex = [
+        x, y, x+width, y, x+width, y+height, x, y+height
+      ];
+      draw_bounding_box(currentFrame, newFdsstVertex, cv, "number");
       // console.log(KCF.box);	
-      cv.circle(currentFrame, {
-        x: (KCF.box.x + 0.5*(KCF.box.width)),
-        y: (KCF.box.y + 0.5*(KCF.box.height)),
-      }, 5, new cv.Scalar(0, 0, 255, 255), -1);
+      // cv.circle(currentFrame, {
+      //   x: (roi.x + 0.5*(roi.width)),
+      //   y: (roi.y + 0.5*(roi.height)),
+      // }, 5, new cv.Scalar(0, 0, 255, 255), -1);
+
       cv.imshow(currentFrame);  
       console.log("KCF跟踪&&绘制中心点&&展示图像耗时：", Date.now()-startTime);  
   },
@@ -1060,7 +976,7 @@ Page({
   frameSizeInit() {
     const platform = wx.getSystemInfoSync().platform;
     console.log(platform);
-    if( platform == "android" ){      //小米9的帧尺寸
+    if( platform == "android" ){      //小米9(红米pro)的帧尺寸
       cameraConfig.frame.width = 288;
       cameraConfig.frame.height = 384;
     } else if(platform == "devtools") {

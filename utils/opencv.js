@@ -31,6 +31,8 @@
 //       cv = cv || {};
 
 
+
+
       var Module = {};
       var readyPromiseResolve, readyPromiseReject;
       Module["ready"] = new Promise(function (resolve, reject) {
@@ -608,8 +610,9 @@
         wasmMemory = new WebAssembly.Memory({
           initial: INITIAL_INITIAL_MEMORY / 65536,
           maximum: 1073741824 / 65536,
-          shared: true
+          shared: false
         });
+        
       // }
       if (wasmMemory) {
         buffer = wasmMemory.buffer;
@@ -865,8 +868,7 @@
 
 
         function instantiateAsync() {
-          // var wasmurl = "https://www.wechatvr.org/opencvRealese/opencv1/opencv.zip";
-          var wasmurl = "https://www.wechatvr.org/opencvRealese/fHog_C/opencv_js.zip";
+          var wasmurl = Module["wasmurl"];
           var wasmfilename = wasmurl.slice(wasmurl.lastIndexOf("/") + 1);
           var USER_DATA_PATH = wx.env.USER_DATA_PATH;
           var wasmdir = USER_DATA_PATH + "/wasm/";

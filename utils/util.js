@@ -454,15 +454,6 @@ let modelPoseUpdate = function (newBB, w, h, modelSize, originalRotation, model,
   model.position.z = -pose.translation[2];
 
 
-  //测试
-  // a++;
-  // model.position.x = a;
-
-
-
-
-
-
 }
 
 
