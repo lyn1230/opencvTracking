@@ -1,12 +1,7 @@
-console.log("ddd");
-const THREE = require("../../utils/three/three.weapp.min");
+// const THREE = require("../../utils/three/three.weapp.min");
 const wasm = require("../../utils/opencv");
 
-
-const {
-  fbxModelLoad
-} = require("../../utils/three/model");
-
+const { fbxModelLoad} = require("../../utils/three/model");
 
 const {
   alertMini,
@@ -68,7 +63,7 @@ const templateImage = {
 };
 let dev = {
   ifStartListen: true, //是否开启监听器
-  image: templateImage.imageTem, //模板图是校园卡还是原来庄哥的图
+  image: templateImage.imageSchool, //模板图是校园卡还是原来庄哥的图
   frameCount: 10000, //识别几帧之后停止下一帧的获取
   ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
   orb: 0, //使用了几次orb的方法（l-k几次跟丢）
@@ -180,6 +175,7 @@ Page({
       useCache: false, //是否使用缓存
       self: this,
       success: function (Module) {
+        console.log("load wasm success");
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
         console.log(cv);
@@ -220,10 +216,10 @@ Page({
         listener.start();
       }
     };
-    // if (dev.ifStartListen) {
-    //   listener.start();
-    // }
-    this.loadAnimation(animationUrl, startListen);
+    if (dev.ifStartListen) {
+      listener.start();
+    }
+    // this.loadAnimation(animationUrl, startListen);
   },
 
   /*需要用到cv的相关变量的定义*/
@@ -246,8 +242,8 @@ Page({
 
 
     //KCF相关变量
-    KCF = new cv.FDSSTTracker(true, true, true, true);  //是否使用fHOG特征，是否固定大小，[]，是否使用lab特征
-    KCF.scale_step = 1.05;
+    KCF = new cv.FDSSTTracker(true, true, true, true);  //是否使用fHOG特征，是否固定大小，是否使用尺度滤波器，是否使用lab特征
+    KCF.scale_step = 1;
     KCF.scale_lr = 0.03;
     KCF.interp_factor = 0.02;
 
@@ -312,16 +308,10 @@ Page({
           if(res[1]){        //如果找到了模板图的初始位置
             let position = res[0];    //box中含有初始位置
             box = new cv.Rect(position.x, position.y, position.width, position.height);      
+            // box = new cv.Rect(50, 50, 150, 150);
             that.KCF_init(box); //KCF滤波器初始化    
             flag_trackKCF = 1;     
-          }
-         
-         
-            
-            // box = new cv.Rect(83.9,84.2,148,146);      
-            // that.KCF_init(box); //KCF滤波器初始化    
-            // flag_trackKCF = 1;     
-          
+          }         
         } else {
           that.tracking_KCF(); //特征点KCF跟踪
         }
@@ -569,7 +559,7 @@ Page({
 
       // 筛选goodmatches良好匹配
       goodMatches = new cv.DMatchVector();
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         KNN_Matches = new cv.DMatchVectorVector();
         matcher.knnMatch(descriptors, originalDescriptorsArray[i], KNN_Matches, 2);
         // 筛选goodmatches良好匹配
@@ -606,10 +596,20 @@ Page({
       for (let i = 0; i < goodMatches.size(); i++) {
         matched1.data32F[2 * i] = Math.round(originalKeyPointsArray[tempImage_id].get(goodMatches.get(i).trainIdx).pt.x);
         matched1.data32F[2 * i + 1] = Math.round(originalKeyPointsArray[tempImage_id].get(goodMatches.get(i).trainIdx).pt.y);
-
+        
         matched2.data32F[2 * i] = Math.round(keyPoints.get(goodMatches.get(i).queryIdx).pt.x);
         matched2.data32F[2 * i + 1] = Math.round(keyPoints.get(goodMatches.get(i).queryIdx).pt.y);
       }
+
+      // console.log(matched2);
+      // debugger;
+      // for(let i=0;i<matched2.length;i++){
+      //   cv.circle(currentFrame, {  
+      //         x: matched2.data32F[2 * i],
+      //         y: matched2.data32F[2 * i + 1]
+      //       }, 5, color[0], -1);
+      // }
+      
 
 
       var inlierSize = 0;
@@ -719,7 +719,7 @@ Page({
       vertex[5] = vertex[7] = roi.y + roi.height;
 
       let timeTemp = Date.now()      
-      model_poseUpdateKCF(vertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, model, cv);
+      // model_poseUpdateKCF(vertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, model, cv);
       console.log("更改模型位置耗时：", Date.now()-timeTemp);
       
       dev.ifRecognized = true;    //跟踪到了模板图，更新性能测试指标
