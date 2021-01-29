@@ -58,12 +58,18 @@ const templateImage = {
     "https://www.wechatvr.org/imageTemplate/school_2.jpg",
     "https://www.wechatvr.org/imageTemplate/school_3.jpg",
   ],
+  imageSheng: [
+    "https://www.wechatvr.org/imageTemplate/sheng_0.jpg",
+    "https://www.wechatvr.org/imageTemplate/sheng_1.jpg",
+    "https://www.wechatvr.org/imageTemplate/sheng_2.jpg",
+    "https://www.wechatvr.org/imageTemplate/sheng_3.jpg",
+  ],
   tempImage_id: -1,
   vertexArray: new Array()
 };
 let dev = {
   ifStartListen: true, //是否开启监听器
-  image: templateImage.imageSchool, //模板图是校园卡还是原来庄哥的图
+  image: templateImage.imageSheng, //模板图是校园卡还是原来庄哥的图
   frameCount: 10000, //识别几帧之后停止下一帧的获取
   ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
   orb: 0, //使用了几次orb的方法（l-k几次跟丢）
@@ -132,6 +138,7 @@ let KF = null; // instantiate Kalman Filter
 
 //绘制光流轨迹
 let mask = null;
+let oldCenter = {x: 0, y:0};
 
 //姿态估计
 let originalRotation;
@@ -243,7 +250,7 @@ Page({
 
     //KCF相关变量
     KCF = new cv.FDSSTTracker(true, true, true, true);  //是否使用fHOG特征，是否固定大小，是否使用尺度滤波器，是否使用lab特征
-    KCF.scale_step = 1;
+    KCF.scale_step = 1.02;
     KCF.scale_lr = 0.03;
     KCF.interp_factor = 0.02;
 
@@ -307,8 +314,8 @@ Page({
           res = that.findInitialPosition(startTime); //ORB找到初始角点
           if(res[1]){        //如果找到了模板图的初始位置
             let position = res[0];    //box中含有初始位置
-            box = new cv.Rect(position.x, position.y, position.width, position.height);      
-            // box = new cv.Rect(50, 50, 150, 150);
+            // box = new cv.Rect(position.x, position.y, position.width, position.height);      
+            box = new cv.Rect(50, 50, 150, 150);
             that.KCF_init(box); //KCF滤波器初始化    
             flag_trackKCF = 1;     
           }         
@@ -601,17 +608,6 @@ Page({
         matched2.data32F[2 * i + 1] = Math.round(keyPoints.get(goodMatches.get(i).queryIdx).pt.y);
       }
 
-      // console.log(matched2);
-      // debugger;
-      // for(let i=0;i<matched2.length;i++){
-      //   cv.circle(currentFrame, {  
-      //         x: matched2.data32F[2 * i],
-      //         y: matched2.data32F[2 * i + 1]
-      //       }, 5, color[0], -1);
-      // }
-      
-
-
       var inlierSize = 0;
       let inlierMatches = new cv.DMatchVector(); // 不需要测试时再删掉!!!!!!!!!!
       let inlierMask = new cv.Mat();
@@ -658,11 +654,13 @@ Page({
             //   y: y
             // }, 5, color[0], -1);
 
-            // cv.imshow(currentFrame);
+            cv.imshow(currentFrame);
+      
             console.log(`耗时${Date.now()-time}ms`);
           }
         }
       }
+      console.log("识别的是第几个模板图：",tempImage_id);
     }
     return [{x, y, width, height}, ifFindPosition];
   },
@@ -728,14 +726,17 @@ Page({
         x, y, x+width, y, x+width, y+height, x, y+height
       ];
       draw_bounding_box(currentFrame, newFdsstVertex, cv, "number");
-      // console.log(KCF.box);	
-      // cv.circle(currentFrame, {
-      //   x: (roi.x + 0.5*(roi.width)),
-      //   y: (roi.y + 0.5*(roi.height)),
-      // }, 5, new cv.Scalar(0, 0, 255, 255), -1);
 
+      cv.line(mask, 
+        { x: x+0.5*width, y: y+0.5*height },
+        { x: oldCenter.x, y: oldCenter.y }
+      , new cv.Scalar(0, 255, 0), 1);      
+      cv.add(currentFrame, mask, currentFrame);
       cv.imshow(currentFrame);  
       console.log("KCF跟踪&&绘制中心点&&展示图像耗时：", Date.now()-startTime);  
+      oldCenter.x = x+0.5*width;
+      oldCenter.y = y+0.5*height;
+
   },
 
   calculate_transform_new: function () {
