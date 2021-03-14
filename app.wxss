@@ -19,6 +19,8 @@
   width:288px;
   height:352px;
   box-sizing: border-box;
+  border: 2px solid black;
+  margin: 0 auto;
 }
 .animaionClass {
   position: absolute;

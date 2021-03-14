@@ -869,9 +869,9 @@
 
         function instantiateAsync() {
           var wasmurl = Module["wasmurl"];
-          var wasmfilename = wasmurl.slice(wasmurl.lastIndexOf("/") + 1);
-          var USER_DATA_PATH = wx.env.USER_DATA_PATH;
-          var wasmdir = USER_DATA_PATH + "/wasm/";
+          var wasmfilename = wasmurl.slice(wasmurl.lastIndexOf("/") + 1);   //opencv_js.zip
+          var USER_DATA_PATH = wx.env.USER_DATA_PATH;                       //http://usr
+          var wasmdir = USER_DATA_PATH + "/wasm/";                          //http://usr/wasm
           var flag = true;
           var FSM = wx.getFileSystemManager();
           try {
@@ -8477,7 +8477,7 @@
             img.onload = function () {            
                 ctx.drawImage(img, 0, 0, img.width, img.height);
                 var imgData = ctx.getImageData(0, 0, canvas.width, canvas.width);
-                resolve(cv.matFromImageData(imgData));          
+                resolve(cv.matFromImageData(imgData));      
                 
             }
             img.onerror=function(evt){

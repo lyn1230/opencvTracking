@@ -11,10 +11,10 @@ let showToast = function (description, duration = 1500, icon = 'success') {
 };
 
 let initOriginalFrameInfo = async function (originalFrameArray, originalKeyPointsArray, originalDescriptorsArray, imageArray, width, height, cv, detector) {
-  let originalFrame1 = new cv.Mat(height, width, cv.CV_8UC4);
-  let originalFrame2 = new cv.Mat(height, width, cv.CV_8UC4);
-  let originalFrame3 = new cv.Mat(height, width, cv.CV_8UC4);
-  let originalFrame4 = new cv.Mat(height, width, cv.CV_8UC4);
+  let originalFrame1 = new cv.Mat(250, 250, cv.CV_8UC4);
+  let originalFrame2 = new cv.Mat(200, 200, cv.CV_8UC4);
+  let originalFrame3 = new cv.Mat(170, 170, cv.CV_8UC4);
+  let originalFrame4 = new cv.Mat(140, 140, cv.CV_8UC4);
 
   let originalKeyPoints1 = new cv.KeyPointVector();
   let originalKeyPoints2 = new cv.KeyPointVector();
@@ -420,8 +420,8 @@ let performanceMonitoring = function (performMonitor, ifRecognized, timeStart) {
     ++performMonitor.frameRecognizedCount;
   }
   performMonitor.recogRate = `${Math.round((performMonitor.frameRecognizedCount)/(performMonitor.frameCount)*100)}%`;
-  console.log("FPS:", performMonitor.fps);
-  console.log("识别率:", performMonitor.recogRate);
+  // console.log("FPS:", performMonitor.fps);
+  // console.log("识别率:", performMonitor.recogRate);
 }
 
 
