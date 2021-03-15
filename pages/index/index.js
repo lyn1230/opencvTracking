@@ -1,6 +1,8 @@
 const THREE = require("../../utils/three/three.weapp.min");
 const wasm = require("../../utils/opencv");
-const { fbxModelLoad} = require("../../utils/three/model");
+const {
+  fbxModelLoad
+} = require("../../utils/three/model");
 
 const {
   alertMini,
@@ -39,7 +41,7 @@ const performMonitor = { //性能监视器
   frameRecognizedCount: 0, //记录模板图被识别出来的帧数
   recogRate: 0
 };
-let camera, renderer, scene, model, startListen, geometry; //three.js相关的三大要素
+let camera, renderer, scene, model, startListen, geometry, ambient, material; //three.js相关的三大要素
 
 const templateImage = {
   originalDescriptorsArray: new Array(),
@@ -78,9 +80,9 @@ let dev = {
   frameCount: 10000, //识别几帧之后停止下一帧的获取
   ifRecognized: false, //是否识别出模板图，用来计算fps用的，防止没识别出来的循环得到较高的帧率从而影响fps的计算
   orb: 0, //使用了几次orb的方法（l-k几次跟丢）
-  onlyDetect: false,    //是否只使用detect的方案
-  ifOrbAndLK: false,    //是否采用orb+lk的方法
-  ifOrbAndKCF: false,    //是否采用ORB+KCF的跟踪方法
+  onlyDetect: false, //是否只使用detect的方案
+  ifOrbAndLK: false, //是否采用orb+lk的方法
+  ifOrbAndKCF: true, //是否采用ORB+KCF的跟踪方法
 };
 
 const currentFrameSet = {
@@ -96,8 +98,8 @@ const currentFrameSet = {
 };
 const animationUrl = "https://weixin.wechatvr.org/animation/pig/fuzhu.fbx";
 let initial_position = {
-  x:0,
-  y:0,
+  x: 0,
+  y: 0,
   width: 0,
   height: 0,
   findFlag: false
@@ -143,7 +145,10 @@ let KF = null; // instantiate Kalman Filter
 
 //绘制光流轨迹
 let mask = null;
-let oldCenter = {x:0, y:0};  //测试跟踪轨迹，是上一帧跟踪到的模板图的中心点位置
+let oldCenter = {
+  x: 0,
+  y: 0
+}; //测试跟踪轨迹，是上一帧跟踪到的模板图的中心点位置
 
 //姿态估计
 let originalRotation;
@@ -155,7 +160,7 @@ let flag_trackLK = 0;
 //开启KCF跟踪标志位
 let flag_trackKCF = 0;
 let KCF = null;
-let isinit = false;   //KCF滤波器是否已经初始化好
+let isinit = false; //KCF滤波器是否已经初始化好
 let box = null;
 
 // 产生随机颜色值
@@ -163,16 +168,28 @@ let color = [];
 //不知道放在哪里的变量
 
 
+//尺寸
+let widthFrame;
+let heightFrame;
+
 
 
 Page({
-  data: {    
+  data: {
+    widthScreen: 360,
+    heightScreen: 640
   },
-
+  onLoad: function () {
+    console.log("屏幕宽高：", wasm.widthScreenOfSysInfo, wasm.heightScreenOfSysInfo);
+    this.setData({
+      widthScreen: wasm.widthScreenOfSysInfo,
+      heightScreen: wasm.heightScreenOfSysInfo,
+    })
+  },
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
-    this.frameSizeInit(); //自动适配实时帧的宽高
-    this.getwasm(); //加载opencv.js，确保可以使用cv
+    // this.frameSizeInit(); //自动适配实时帧的宽高
+    this.webglInit(); //初始化webgl显示，成功后加载wasm
 
     // //另一种显示方式
     // this.webglInit();
@@ -190,17 +207,20 @@ Page({
       type: "zip", //格式：wasm,zip
       useCache: false, //是否使用缓存
       self: this,
+      width: that.data.widthScreen,
+      height: that.data.heightScreen,
       success: function (Module) {
         console.log("load wasm success");
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
         console.log(cv);
+        wx.hideLoading();
         that.main();
       }
     });
   },
 
-  mainWebGL: async function(){
+  mainWebGL: async function () {
     let that = this;
     let listener = wx.createCameraContext().onCameraFrame((res) => {
       if (cameraConfig.flag === false)
@@ -210,26 +230,27 @@ Page({
       cameraConfig.flag = false; //立即停止下一帧的获取，等待当前帧处理后，再处理下一帧
       cameraConfig.frame.data = new Uint8Array(res.data); //更新实时帧的图像数据     
 
-      
+
       let texture = new THREE.DataTexture(new Uint8Array(res.data), cameraConfig.frame.width, cameraConfig.frame.height, THREE.RGBAFormat);
-  
+
       texture.needsUpdate = true; //纹理更新，作用存疑，似乎是正作用
       let tex_material = new THREE.MeshPhongMaterial({
         map: texture, // 设置纹理贴图
         side: THREE.DoubleSide
-      });      
+      });
       let mesh = new THREE.Mesh(geometry, tex_material);
       scene.add(mesh);
-      renderer.render(scene, camera);     
-      cameraConfig.flag = true; 
-      console.log("耗时：", Date.now()-timeStart);
-  });
-  if (dev.ifStartListen) {
-    listener.start();
-  }
-},
+      renderer.render(scene, camera);
+      cameraConfig.flag = true;
+      console.log("耗时：", Date.now() - timeStart);
+    });
+    if (dev.ifStartListen) {
+      listener.start();
+    }
+  },
   main: async function () {
     let that = this;
+    scene.add(ambient);
     this.varInit(); //变量初始化
     await this.tempHandle(); //处理模板图
 
@@ -239,14 +260,25 @@ Page({
       dev.ifRecognized = false;
       let timeStart = Date.now();
       cameraConfig.flag = false; //立即停止下一帧的获取，等待当前帧处理后，再处理下一帧
+
+      let heightNewIndex = res.width * 4 * (that.data.heightScreen + 1);
+      let tempData = res.data.slice(0, heightNewIndex);
       cameraConfig.frame.data = new Uint8ClampedArray(res.data); //更新实时帧的图像数据     
-      if(!cameraConfig.ifHasWidthAndHeight){      //防止无用的重复赋值
+      // cameraConfig.frame.data = new Uint8ClampedArray(tempData); //更新实时帧的图像数据     
+
+      if (!cameraConfig.ifHasWidthAndHeight) { //防止无用的重复赋值
         cameraConfig.frame.width = res.width;
-        cameraConfig.frame.height = res.height;   
+        // cameraConfig.frame.height = that.data.heightScreen;
+        cameraConfig.frame.height = res.height;
+
         currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
-        cameraConfig.ifHasWidthAndHeight = true;   
-      } 
-      that.handleFrame(); 
+        cameraConfig.ifHasWidthAndHeight = true;
+        that.setData({
+          widthFrame: res.width,
+          heightFrame: res.height
+        })
+      }
+      that.handleFrame();
       performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
     });
     startListen = function (resModel) {
@@ -283,7 +315,7 @@ Page({
 
 
     //KCF相关变量
-    KCF = new cv.FDSSTTracker(true, true, true, true);  //是否使用fHOG特征，是否固定大小，是否使用尺度滤波器，是否使用lab特征
+    KCF = new cv.FDSSTTracker(true, true, true, true); //是否使用fHOG特征，是否固定大小，是否使用尺度滤波器，是否使用lab特征
     KCF.scale_step = 1.02;
     KCF.scale_lr = 0.03;
     KCF.interp_factor = 0.02;
@@ -314,6 +346,7 @@ Page({
     if (performMonitor.frameCount < dev.frameCount) {
       cameraConfig.flag = true; //每一帧图像处理完成，标志位更新，继续获取下一帧
     } else { //处理完所有的帧之后，输出性能测试结果
+      console.log(performMonitor.frameCount);
       console.log("识别出的帧数：", performMonitor.frameRecognizedCount);
       console.log("总共处理的帧数：", performMonitor.frameCount);
       console.log("识别率：", performMonitor.recogRate);
@@ -325,46 +358,50 @@ Page({
   track() {
     let that = this;
     let startTime = Date.now();
-    let { frame } = cameraConfig;
-    let { currentFrame, currentGray } = currentFrameSet;
+    let {
+      frame
+    } = cameraConfig;
+    let {
+      currentFrame,
+      currentGray
+    } = currentFrameSet;
 
     currentFrame.data.set(frame.data); //摄像机图像的Mat格式
 
     if (dev.onlyDetect) {
 
-        that.findFeaturePoints();
+      that.findFeaturePoints();
 
-    } else if(dev.ifOrbAndLK) {
+    } else if (dev.ifOrbAndLK) {
 
-        cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化  
-        if (flag_trackLK == 0) {
-          that.findFeaturePoints(); //ORB找到初始角点
-        } else {
-          that.tracking_LK(); //特征点l-k跟踪
-        }
+      cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化  
+      if (flag_trackLK == 0) {
+        that.findFeaturePoints(); //ORB找到初始角点
+      } else {
+        that.tracking_LK(); //特征点l-k跟踪
+      }
 
     } else if (dev.ifOrbAndKCF) {
-        if (flag_trackKCF == 0) {
-          res = that.findInitialPosition(startTime); //ORB找到初始角点          
-          if(res[1]){        //如果找到了模板图的初始位置
-            let position = res[0];    //box中含有初始位置
-            box = new cv.Rect(position.x, position.y, position.width, position.height);      
-            // box = new cv.Rect(22, 52, 204, 206);
-            oldCenter.x = position.x + position.width/2;
-            oldCenter.y = position.y + position.height/2;
-            that.KCF_init(box); //KCF滤波器初始化    
-            flag_trackKCF = 1;     
-          }         
-        } else {
-          that.tracking_KCF(); //特征点KCF跟踪
+      if (flag_trackKCF == 0) {
+        res = that.findInitialPosition(startTime); //ORB找到初始角点          
+        if (res[1]) { //如果找到了模板图的初始位置
+          let position = res[0]; //box中含有初始位置
+          box = new cv.Rect(position.x, position.y, position.width, position.height);
+          // box = new cv.Rect(22, 52, 204, 206);
+          oldCenter.x = position.x + position.width / 2;
+          oldCenter.y = position.y + position.height / 2;
+          that.KCF_init(box); //KCF滤波器初始化    
+          flag_trackKCF = 1;
         }
-    } else {
-      let startime = Date.now();
-      cv.imshow(currentFrame); 
-      console.log("耗时：", (Date.now()-startime), "ms");
+      } else {
+        that.tracking_KCF(); //特征点KCF跟踪
+      }
     }
   },
-
+  sleep(ms) {
+    var _this = this
+    return new Promise(resolve => setTimeout(resolve, ms))
+  },
   tempHandle: async function () {
     let {
       originalFrameArray,
@@ -407,7 +444,7 @@ Page({
     //得到实时帧的特征点和描述子    
 
     // cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
-  
+
 
     if (1) {
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
@@ -497,9 +534,9 @@ Page({
             let x_max = Math.max(newVertex.data32F[2], newVertex.data32F[4]);
             let y_min = Math.min(newVertex.data32F[1], newVertex.data32F[3]);
             let y_max = Math.max(newVertex.data32F[5], newVertex.data32F[7]);
-            width = height = (Math.abs(x_max - x_min) +Math.abs(y_max - y_min))/2;
-            oldCenter.x =  x_min + 0.5*width;
-            oldCenter.y =  y_min + 0.5*height;
+            width = height = (Math.abs(x_max - x_min) + Math.abs(y_max - y_min)) / 2;
+            oldCenter.x = x_min + 0.5 * width;
+            oldCenter.y = y_min + 0.5 * height;
 
             cv.imshow(currentFrame);
             dev.ifRecognized = true;
@@ -569,17 +606,17 @@ Page({
       }
     }
     // currentFrame.delete();
-  }, 
+  },
 
-  findInitialPosition: function(time){    
+  findInitialPosition: function (time) {
     dev.orb++;
     let x, y, width, height, ifFindPosition = false;
     let {
-      currentFrame,  
-      currentGray,   
-      detector,      
+      currentFrame,
+      currentGray,
+      detector,
       feature_size,
-      keyPoints,     
+      keyPoints,
       descriptors,
       matcher
     } = currentFrameSet;
@@ -602,14 +639,19 @@ Page({
     // currentFrame.data.set(frame.data); //摄像机图像的Mat格式
 
     cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
-  
+
 
     if (1) {
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
       if (keyPoints.size() < 0.5 * feature_size) {
-        console.log("info:keypoints is too few, return now...");    //特征点过少，返回
+        console.log("info:keypoints is too few, return now..."); //特征点过少，返回
         cv.imshow(currentFrame);
-        return [{x, y, width, height}, ifFindPosition];
+        return [{
+          x,
+          y,
+          width,
+          height
+        }, ifFindPosition];
       }
       detector.compute(currentGray, keyPoints, descriptors); //得到描述子  
 
@@ -644,7 +686,12 @@ Page({
       if (tempImage_id == -1) {
         goodMatches.delete();
         cv.imshow(currentFrame);
-        return [{x, y, width, height}, ifFindPosition]; 
+        return [{
+          x,
+          y,
+          width,
+          height
+        }, ifFindPosition];
       }
 
       // 从goodmatch匹配中获得分别获得相对应图像的关键点信息
@@ -653,7 +700,7 @@ Page({
       for (let i = 0; i < goodMatches.size(); i++) {
         matched1.data32F[2 * i] = Math.round(originalKeyPointsArray[tempImage_id].get(goodMatches.get(i).trainIdx).pt.x);
         matched1.data32F[2 * i + 1] = Math.round(originalKeyPointsArray[tempImage_id].get(goodMatches.get(i).trainIdx).pt.y);
-        
+
         matched2.data32F[2 * i] = Math.round(keyPoints.get(goodMatches.get(i).queryIdx).pt.x);
         matched2.data32F[2 * i + 1] = Math.round(keyPoints.get(goodMatches.get(i).queryIdx).pt.y);
       }
@@ -680,7 +727,7 @@ Page({
 
           // 对坐标点进行投射变换,利用单应性矩阵,将原始四顶点vertexArray得到新的对应四顶点newVertex    
           cv.perspectiveTransform(vertexArray[tempImage_id], newVertex, homography);
-                    
+
           // 判断识别区域是否大致符合四边形
           if (rectangle(newVertex)) {
             cameraConfig.oldVertex = newVertex;
@@ -688,7 +735,7 @@ Page({
             let x_max = Math.max(newVertex.data32F[2], newVertex.data32F[4]);
             let y_min = Math.min(newVertex.data32F[1], newVertex.data32F[3]);
             let y_max = Math.max(newVertex.data32F[5], newVertex.data32F[7]);
-            width = height = (Math.abs(x_max - x_min) +Math.abs(y_max - y_min))/2;
+            width = height = (Math.abs(x_max - x_min) + Math.abs(y_max - y_min)) / 2;
 
             x = x_min;
             y = y_min;
@@ -707,14 +754,19 @@ Page({
             // let grayMatchingImage = new cv.Mat(2 * cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
             // cv.drawMatches(currentFrame, keyPoints, templateImage.originalFrameArray[tempImage_id], originalKeyPointsArray[tempImage_id], inlierMatches, grayMatchingImage, new cv.Scalar(0, 255, 0), new cv.Scalar(0,0,255));
             cv.imshow(currentFrame);
-            
+
             // console.log(`耗时${Date.now()-time}ms`);
           }
         }
       }
       // console.log("识别的是第几个模板图：",tempImage_id);
     }
-    return [{x, y, width, height}, ifFindPosition];
+    return [{
+      x,
+      y,
+      width,
+      height
+    }, ifFindPosition];
   },
 
   tracking_LK: function () {
@@ -724,7 +776,7 @@ Page({
     } = currentFrameSet;
 
     // currentFrame.data.set(cameraConfig.frame.data); //摄像机图像的Mat格式
-    
+
     let time = Date.now();
 
     cv.calcOpticalFlowPyrLK(oldGray, currentGray, LK_pointOld, LK_pointNew, st, err, winSize, maxLevel, criteria);
@@ -733,7 +785,7 @@ Page({
     // currentFrame.delete();
   },
 
-  KCF_init: function(box){
+  KCF_init: function (box) {
     let {
       currentFrame,
       currentGray
@@ -741,53 +793,64 @@ Page({
     //KCF跟踪代码
     cv.cvtColor(currentFrame, currentGray, 11);
     KCF.init(currentGray, box);
-    
+
   },
 
-  tracking_KCF: function(){
+  tracking_KCF: function () {
+    let that = this;
     let {
       currentFrame,
       currentGray
     } = currentFrameSet;
     //KCF跟踪代码
     cv.cvtColor(currentFrame, currentGray, 11);
-      let startTime = Date.now();
-      let roi = KCF.update(currentGray);
-      console.log(KCF.confidence, roi);
-      // console.log(`KCF耗时${Date.now()-startTime}ms`);
-      let vertex = [];
-      let {x, y, width, height} = roi;
-      vertex[0] = vertex[6] = roi.x;
-      vertex[1] = vertex[3] = roi.y;
-      vertex[2] = vertex[4] = roi.x + roi.width;
-      vertex[5] = vertex[7] = roi.y + roi.height;
+    let startTime = Date.now();
+    let roi = KCF.update(currentGray);
+    console.log(KCF.confidence, roi);
+    // console.log(`KCF耗时${Date.now()-startTime}ms`);
+    let vertex = [];
+    let {
+      x,
+      y,
+      width,
+      height
+    } = roi;
+    vertex[0] = vertex[6] = roi.x;
+    vertex[1] = vertex[3] = roi.y;
+    vertex[2] = vertex[4] = roi.x + roi.width;
+    vertex[5] = vertex[7] = roi.y + roi.height;
 
-      // let timeTemp = Date.now()  
-          
-      // model_poseUpdateKCF(vertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, model, cv);
-      // console.log("更改模型位置耗时：", Date.now()-timeTemp);
-      
-      dev.ifRecognized = true;    //跟踪到了模板图，更新性能测试指标    
-      draw_bounding_box(currentFrame, vertex, cv, "number");
-      console.log("此处1");
-      cv.line(mask, 
-        { x: x+0.5*width, y: y+0.5*height },
-        { x: oldCenter.x, y: oldCenter.y }
-      , new cv.Scalar(255,230,0), 2);  
-      console.log(cameraConfig.frame.width, "高：", cameraConfig.frame.height);    
-      console.log(mask);
-      cv.add(currentFrame, mask, currentFrame);
-      console.log("此处3");
-      cv.imshow(currentFrame);  
-      console.log("此处4");
-      console.log("KCF跟踪&&绘制中心点&&展示图像耗时：", Date.now()-startTime);  
-      oldCenter.x = x+0.5*width;
-      oldCenter.y = y+0.5*height;
-      console.log("此处5");
+    // let timeTemp = Date.now()  
+
+    // model_poseUpdateKCF(vertex, cameraConfig.frame.width, cameraConfig.frame.height, modelSize, model, cv);
+    // console.log("更改模型位置耗时：", Date.now()-timeTemp);
+
+    dev.ifRecognized = true; //跟踪到了模板图，更新性能测试指标    
+    draw_bounding_box(currentFrame, vertex, cv, "number");
+    console.log("此处1");
+    cv.line(mask, {
+      x: x + 0.5 * width,
+      y: y + 0.5 * height
+    }, {
+      x: oldCenter.x,
+      y: oldCenter.y
+    }, new cv.Scalar(255, 230, 0), 2);
+    console.log(cameraConfig.frame.width, "高：", cameraConfig.frame.height);
+    console.log(mask);
+    cv.add(currentFrame, mask, currentFrame);
+    console.log("此处3");
+    that.showFrame();
+
+    // cv.imshow(currentFrame);
+    console.log("此处4");
+    console.log("KCF跟踪&&绘制中心点&&展示图像耗时：", Date.now() - startTime);
+    oldCenter.x = x + 0.5 * width;
+    oldCenter.y = y + 0.5 * height;
+    console.log("此处5");
   },
 
   calculate_transform_new: function () {
-    let startTime = Date.now(); 
+    let startTime = Date.now();
     let {
       newVertex,
       oldVertex
@@ -881,16 +944,19 @@ Page({
           let x_max = Math.max(newVertex.data32F[2], newVertex.data32F[4]);
           let y_min = Math.min(newVertex.data32F[1], newVertex.data32F[3]);
           let y_max = Math.max(newVertex.data32F[5], newVertex.data32F[7]);
-          width = height = (Math.abs(x_max - x_min) +Math.abs(y_max - y_min))/2;
+          width = height = (Math.abs(x_max - x_min) + Math.abs(y_max - y_min)) / 2;
 
-          cv.line(mask, 
-            { x: x_min+0.5*width, y: y_min+0.5*height },
-            { x: oldCenter.x, y: oldCenter.y }
-          , new cv.Scalar(255,230,0), 2);      
+          cv.line(mask, {
+            x: x_min + 0.5 * width,
+            y: y_min + 0.5 * height
+          }, {
+            x: oldCenter.x,
+            y: oldCenter.y
+          }, new cv.Scalar(255, 230, 0), 2);
           cv.add(currentFrame, mask, currentFrame);
-          cv.imshow(currentFrame);  
-          oldCenter.x = x_min+0.5*width;
-          oldCenter.y = y_min+0.5*height;
+          cv.imshow(currentFrame);
+          oldCenter.x = x_min + 0.5 * width;
+          oldCenter.y = y_min + 0.5 * height;
 
 
           dev.ifRecognized = true;
@@ -908,21 +974,21 @@ Page({
 
           // 绘制角点的轨迹
           //for (let i = 0; i < good_cnt; i++) {
-            // try {
-            //      cv.line(mask,
-            //          {x: goodNew.data32F[2 * i], y: goodNew.data32F[2 * i + 1]},
-            //          {x: goodOld.data32F[2 * i], y: goodOld.data32F[2 * i + 1]},
-            //          color[i], 1);
-            //  } catch (error) {
-            //      console.log(error)
-            //      flag_trackLK = 0;
-            //      return;
-            //  }
+          // try {
+          //      cv.line(mask,
+          //          {x: goodNew.data32F[2 * i], y: goodNew.data32F[2 * i + 1]},
+          //          {x: goodOld.data32F[2 * i], y: goodOld.data32F[2 * i + 1]},
+          //          color[i], 1);
+          //  } catch (error) {
+          //      console.log(error)
+          //      flag_trackLK = 0;
+          //      return;
+          //  }
 
-            // cv.circle(currentFrame, {
-            //   x: goodNew.data32F[2 * i],
-            //   y: goodNew.data32F[2 * i + 1]
-            // }, 5, color[0], -1);
+          // cv.circle(currentFrame, {
+          //   x: goodNew.data32F[2 * i],
+          //   y: goodNew.data32F[2 * i + 1]
+          // }, 5, color[0], -1);
           //}
           // cv.add(currentFrame, mask, currentFrame);
           // cv.imshow(currentFrame);
@@ -995,36 +1061,43 @@ Page({
 
   webglInit() {
     let that = this;
-    const query = wx.createSelectorQuery().in(that);
-    let nodeTemp = query.selectAll('#myCanvas');
-    nodeTemp.node();
-    query.exec(function (res) {
-      let canvasId = res[0][0].node._canvasId;
-      const canvas = new THREE.global.registerCanvas(res[0][0].node);
-      let k = cameraConfig.frame.width / cameraConfig.frame.height;
-      let s = cameraConfig.frame.height / 2;
-      camera = new THREE.OrthographicCamera(-s * k, s * k, s, -s, 1, 155);
-      var x = cameraConfig.frame.width / 2;
-      var y = -1 * cameraConfig.frame.height / 2;
-      //使camera正对中心
-      camera.position.set(x, y, 150);
-      camera.lookAt(x, y, 0);
+    var query = wx.createSelectorQuery();
+    query.select('#myCanvas')
+      .node()
+      .exec(async (res) => {
+        var webcanvas = res[0].node;
+        const canvas = new THREE.global.registerCanvas(webcanvas);
+        console.log('THREE', THREE);
+        ambient = new THREE.AmbientLight(0xF5F0F0);
+        material = new THREE.MeshPhongMaterial({
+          color: 0x920808,
+          side: THREE.BackSide,
+          opacity: 0.6,
+          transparent: true
+        });
+        var k = that.data.widthScreen / that.data.heightScreen;
+        //var s = 176; //三维场景显示范围控制系数、
+        var s = that.data.heightScreen / 2;
+        camera = new THREE.OrthographicCamera(-s * k, s * k, s, -s, 1, 155);
+        var x = that.data.widthScreen / 2;
+        var y = -that.data.heightScreen / 2;
+        //使camera正对中心
+        camera.position.set(x, y, 150);
+        camera.lookAt(x, y, 0);
 
-      renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        antialias: true, //反锯齿
-        alpha: true //透明
-      });
-      let ambient = new THREE.AmbientLight(0xF5F5F5);
-      geometry = new THREE.PlaneGeometry(cameraConfig.frame.width, cameraConfig.frame.height); //矩形平面
-      geometry.translate(cameraConfig.frame.width / 2, cameraConfig.frame.height / 2, 0);
-      geometry.rotateX(Math.PI);
-      scene = new THREE.Scene();
-      scene.add(ambient);
-      model = new THREE.Object3D();
-      scene.add(model);
-      console.log('完成webgl');
-    })
+        renderer = new THREE.WebGLRenderer({
+          // canvas: webcanvas,
+          antialias: true, //反锯齿
+          alpha: true //透明
+        });
+        renderer.setPixelRatio(wx.getSystemInfoSync().pixelRatio);
+        scene = new THREE.Scene();
+        wx.showLoading({
+          title: 'loading',
+        });
+        // fbxModelLoad(webcanvas, "https://weixin.wechatvr.org/animation/pig/fuzhu.fbx", THREE, that.data.width, that.data.height);
+        that.getwasm();
+      })
   },
   setBackImage() {
     let geometry = new THREE.PlaneGeometry(cameraConfig.frame.width, cameraConfig.frame.height); //矩形平面
@@ -1042,15 +1115,37 @@ Page({
     renderer.render(scene, camera);
   },
 
+  /*显示实时帧画面*/
+  showFrame() {
+    let {frame} = cameraConfig;
+    let geometry = new THREE.PlaneGeometry(frame.width, frame.height); //矩形平面
+    let texture = new THREE.DataTexture(frame.data, frame.width, frame.height, THREE.RGBAFormat);
+    texture.needsUpdate = true; //纹理更新，作用存疑，似乎是正作用
+    let tex_material = new THREE.MeshPhongMaterial({
+      map: texture, // 设置纹理贴图
+      side: THREE.DoubleSide
+    });
+    geometry.translate(frame.width / 2, frame.height / 2, 0);
+    geometry.rotateX(Math.PI);
+    let mesh = new THREE.Mesh(geometry, tex_material);
+    scene.add(mesh);
+    let starTime = Date.now();
+    renderer.render(scene, camera);
+    scene.remove(mesh);
+    geometry.dispose();
+    tex_material.dispose();
+    texture.dispose();
+    console.log("显示耗时：", (Date.now() - starTime), "ms");
+  },
 
   /*图像帧尺寸自适应*/
   frameSizeInit() {
     const platform = wx.getSystemInfoSync().platform;
     console.log(platform);
-    if( platform == "android" ){      //小米9(红米pro)的帧尺寸
-      cameraConfig.frame.width = 288;
-      cameraConfig.frame.height = 384;
-    } else if(platform == "devtools") {
+    if (platform == "android") { //小米9(红米pro)的帧尺寸
+      cameraConfig.frame.width = 480;
+      cameraConfig.frame.height = 640;
+    } else if (platform == "devtools") {
       cameraConfig.frame.width = 288;
       cameraConfig.frame.height = 352;
     }
@@ -1064,5 +1159,12 @@ Page({
   },
   touchEnd(e) {
     THREE.global.touchEventHandlerFactory('canvas', 'touchend')(e)
+  },
+  alert: function (str, time = 500) {
+    wx.showToast({
+      title: str,
+      icon: "none",
+      duration: time
+    })
   },
 })

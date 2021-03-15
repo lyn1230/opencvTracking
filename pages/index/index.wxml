@@ -1,12 +1,14 @@
 <view class="container">
-	<camera frame-size="small" device-position="back" class="cameraClass"></camera>
+	<camera frame-size="medium" device-position="back" class="cameraClass"></camera>
 </view>
-<canvas id="OffscreenCanvas" type="2d" class="canvasClass" disable-scroll="true"></canvas>
 
 
-<canvas type="webgl" id="myCanvas" class="animaionClass"
+<canvas type="webgl" id="myCanvas" style="width: {{widthScreen}}px; height: {{heightScreen}}px;margin:0 auto; border: 2px red solid;box-size: box;"
 bindtouchstart="touchStart" bindtouchmove="touchMove" bindtouchend="touchEnd"
 ></canvas>
+
+<canvas id="OffscreenCanvas" type="2d" class="canvasClass"  disable-scroll="true"></canvas>
+
 
 <!-- <video src="https://www.wechatvr.org/banner.mp4" muted controls="false" show-play-btn="false"
 	show-center-play-btn="false" loop autoplay></video>

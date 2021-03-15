@@ -45,6 +45,12 @@
 
 
 
+      //可用窗口的尺寸
+      let sysInfo = wx.getSystemInfoSync();
+      let widthScreenOfSysInfo = sysInfo.windowWidth;
+      let heightScreenOfSysInfo = sysInfo.windowHeight;
+
+
       var moduleOverrides = {};
       var key;
       for (key in Module) {
@@ -8515,10 +8521,12 @@
                 return;
         }
         var imgData = canvas.createImageData(new Uint8ClampedArray(img.data),img.cols,img.rows);
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const h = wx.getSystemInfoSync().windowHeight;
-        const w = wx.getSystemInfoSync().windowWidth;
-        ctx.putImageData(imgData, 0, 0, 0, 0, w, h);
+        // let dirtyX = Math.abs((wframe-canvas.width)/2);
+        // let dirtyY = (hframe-canvas.height)<0 ? 0 : (hframe-canvas.height)*0.5;
+        // ctx.putImageData(imgData, -dirtyX, -dirtyY, dirtyX, dirtyY, wscreen, hscreen);
+        ctx.putImageData(imgData, 0, 0,0,0, canvas.width, canvas.height);
         cv.imshowed=false;
     };
       Module["VideoCapture"] = function (videoSource) {
@@ -8812,10 +8820,10 @@ function init(args) {
                 Module["canvas"] = res.node;
                 var dpr=1;
                 // var dpr=wx.getSystemInfoSync().pixelRatio;
-                Module["canvas"].width=res.node._width*dpr;
-                Module["canvas"].height=res.node._height*dpr;
+                Module["canvas"].width=args.width;
+                Module["canvas"].height=args.height;
                 Module["canvascontext"]=Module["canvas"].getContext("2d");
-                Module["canvascontext"].scale(dpr,dpr);
+                // Module["canvascontext"].scale(dpr,dpr);
             }).exec();       
             asm = createWasm();
             run();
@@ -8833,6 +8841,7 @@ function init(args) {
 
 module.exports = {
   Module: Module,
-  init: init
-};
-   
+  init: init,
+  widthScreenOfSysInfo: widthScreenOfSysInfo,
+  heightScreenOfSysInfo: heightScreenOfSysInfo
+};  

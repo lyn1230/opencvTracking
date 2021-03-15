@@ -16,8 +16,8 @@
 .canvasClass { 
   /* width:100vw;
   height:640; */
-  width:288px;
-  height:352px;
+  width:480px;
+  height:640px;
   box-sizing: border-box;
   border: 2px solid black;
   margin: 0 auto;
