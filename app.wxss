@@ -16,11 +16,12 @@
 .canvasClass { 
   /* width:100vw;
   height:640; */
-  width:480px;
-  height:640px;
+  width:250px;
+  height:250px;
   box-sizing: border-box;
   border: 2px solid black;
   margin: 0 auto;
+  /* display: none; */
 }
 .animaionClass {
   position: absolute;

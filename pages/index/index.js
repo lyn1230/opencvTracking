@@ -177,10 +177,10 @@ let heightFrame;
 Page({
   data: {
     widthScreen: 360,
-    heightScreen: 640
+    heightScreen: 640,
+    ifHiddenOffCnvas: true
   },
   onLoad: function () {
-    console.log("屏幕宽高：", wasm.widthScreenOfSysInfo, wasm.heightScreenOfSysInfo);
     this.setData({
       widthScreen: wasm.widthScreenOfSysInfo,
       heightScreen: wasm.heightScreenOfSysInfo,
@@ -188,16 +188,11 @@ Page({
   },
   //生命周期函数--监听页面初次渲染完成
   onReady: async function () {
-    // this.frameSizeInit(); //自动适配实时帧的宽高
-    this.webglInit(); //初始化webgl显示，成功后加载wasm
-
-    // //另一种显示方式
-    // this.webglInit();
-    // this.mainWebGL();   
+    await this.webglInit(); //初始化webgl显示，成功后加载wasm  
   },
 
   //事件处理函数console.log();
-  getwasm: function () { //加载opencv.js,加载成功后开启监听器，进行帧处理
+  getwasm: async function () { //加载opencv.js,加载成功后开启监听器，进行帧处理
     let that = this;
     let wasmStart = Date.now();
     console.log("into getwasm");
@@ -209,44 +204,15 @@ Page({
       self: this,
       width: that.data.widthScreen,
       height: that.data.heightScreen,
-      success: function (Module) {
+      success: async function (Module) {
         console.log("load wasm success");
         alertMini(`耗时${(Date.now()-wasmStart)/1000}秒`);
         cv = Module;
         console.log(cv);
         wx.hideLoading();
-        that.main();
+        await that.main();
       }
     });
-  },
-
-  mainWebGL: async function () {
-    let that = this;
-    let listener = wx.createCameraContext().onCameraFrame((res) => {
-      if (cameraConfig.flag === false)
-        return;
-      dev.ifRecognized = false;
-      let timeStart = Date.now();
-      cameraConfig.flag = false; //立即停止下一帧的获取，等待当前帧处理后，再处理下一帧
-      cameraConfig.frame.data = new Uint8Array(res.data); //更新实时帧的图像数据     
-
-
-      let texture = new THREE.DataTexture(new Uint8Array(res.data), cameraConfig.frame.width, cameraConfig.frame.height, THREE.RGBAFormat);
-
-      texture.needsUpdate = true; //纹理更新，作用存疑，似乎是正作用
-      let tex_material = new THREE.MeshPhongMaterial({
-        map: texture, // 设置纹理贴图
-        side: THREE.DoubleSide
-      });
-      let mesh = new THREE.Mesh(geometry, tex_material);
-      scene.add(mesh);
-      renderer.render(scene, camera);
-      cameraConfig.flag = true;
-      console.log("耗时：", Date.now() - timeStart);
-    });
-    if (dev.ifStartListen) {
-      listener.start();
-    }
   },
   main: async function () {
     let that = this;
@@ -254,31 +220,45 @@ Page({
     this.varInit(); //变量初始化
     await this.tempHandle(); //处理模板图
 
-    let listener = wx.createCameraContext().onCameraFrame((res) => {
+    let listener = wx.createCameraContext().onCameraFrame(async (res) => {
       if (cameraConfig.flag === false)
         return;
       dev.ifRecognized = false;
       let timeStart = Date.now();
       cameraConfig.flag = false; //立即停止下一帧的获取，等待当前帧处理后，再处理下一帧
 
-      let heightNewIndex = res.width * 4 * (that.data.heightScreen + 1);
-      let tempData = res.data.slice(0, heightNewIndex);
-      cameraConfig.frame.data = new Uint8ClampedArray(res.data); //更新实时帧的图像数据     
-      // cameraConfig.frame.data = new Uint8ClampedArray(tempData); //更新实时帧的图像数据     
 
-      if (!cameraConfig.ifHasWidthAndHeight) { //防止无用的重复赋值
+      let heightNewIndex = res.width * 4 * that.data.heightScreen;
+      let tempData = res.data.slice(0, heightNewIndex);
+      cameraConfig.frame.data = new Uint8Array(tempData); //更新实时帧的图像数据     
+
+      if (!cameraConfig.ifHasWidthAndHeight) { //防止无用的重复赋值、按照实时帧尺寸初始化webgl渲染和Mat格式的实时帧数据 
+        let {
+          widthScreen,
+          heightScreen
+        } = that.data;
         cameraConfig.frame.width = res.width;
-        // cameraConfig.frame.height = that.data.heightScreen;
-        cameraConfig.frame.height = res.height;
+        cameraConfig.frame.height = heightScreen;
+        var k = widthScreen / heightScreen;
+        //var s = 176; //三维场景显示范围控制系数
+        var s = heightScreen / 2;
+        camera = new THREE.OrthographicCamera(-s * k, s * k, s, -s, 1, 155);
+        var x = widthScreen / 2;
+        var y = -heightScreen / 2;
+        //使camera正对中心
+        camera.position.set(x, y, 150);
+        camera.lookAt(x, y, 0);
 
         currentFrameSet.currentFrame = new cv.Mat(cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
         cameraConfig.ifHasWidthAndHeight = true;
-        that.setData({
-          widthFrame: res.width,
-          heightFrame: res.height
-        })
+        widthFrame = res.width;
+        heightFrame = res.height; //实时帧原始尺寸
+
+        console.log(`实时帧原始尺寸:${widthFrame},${heightFrame}`);
+        console.log(`实时帧处理尺寸:${cameraConfig.frame.width},${cameraConfig.frame.height}`);
+        console.log(`屏幕尺寸:${widthScreen},${heightScreen}`);
       }
-      that.handleFrame();
+      await that.handleFrame();
       performance_monitoring(performMonitor, dev.ifRecognized, timeStart); //性能测试
     });
     startListen = function (resModel) {
@@ -340,8 +320,8 @@ Page({
     }
   },
 
-  handleFrame() {
-    this.track();
+  async handleFrame() {
+    await this.track();
     //this.setBackImage();    //此处后续要添加3D模型的渲染
     if (performMonitor.frameCount < dev.frameCount) {
       cameraConfig.flag = true; //每一帧图像处理完成，标志位更新，继续获取下一帧
@@ -355,19 +335,18 @@ Page({
     }
   },
 
-  track() {
+  async track() {
     let that = this;
     let startTime = Date.now();
     let {
       frame
-    } = cameraConfig;
+    } = cameraConfig; //相机数据(像素数据、即将处理的帧尺寸[裁剪掉了下部分])
     let {
       currentFrame,
       currentGray
-    } = currentFrameSet;
+    } = currentFrameSet; //图像处理需要的格式[利用相机数据转换成的Mat格式]
 
     currentFrame.data.set(frame.data); //摄像机图像的Mat格式
-
     if (dev.onlyDetect) {
 
       that.findFeaturePoints();
@@ -383,18 +362,21 @@ Page({
 
     } else if (dev.ifOrbAndKCF) {
       if (flag_trackKCF == 0) {
-        res = that.findInitialPosition(startTime); //ORB找到初始角点          
+        res = await that.findInitialPosition(startTime); //ORB找到初始角点      
+        // console.log("初始ORB匹配：");    
+        // console.log(res);
         if (res[1]) { //如果找到了模板图的初始位置
           let position = res[0]; //box中含有初始位置
           box = new cv.Rect(position.x, position.y, position.width, position.height);
           // box = new cv.Rect(22, 52, 204, 206);
-          oldCenter.x = position.x + position.width / 2;
-          oldCenter.y = position.y + position.height / 2;
+          // oldCenter.x = position.x + position.width / 2;
+          // oldCenter.y = position.y + position.height / 2;
           that.KCF_init(box); //KCF滤波器初始化    
           flag_trackKCF = 1;
+          that.alert("orb success...");
         }
       } else {
-        that.tracking_KCF(); //特征点KCF跟踪
+        await that.tracking_KCF(); //特征点KCF跟踪
       }
     }
   },
@@ -608,9 +590,10 @@ Page({
     // currentFrame.delete();
   },
 
-  findInitialPosition: function (time) {
+  findInitialPosition: async function (time) {
     dev.orb++;
     let x, y, width, height, ifFindPosition = false;
+    let that = this;
     let {
       currentFrame,
       currentGray,
@@ -634,18 +617,18 @@ Page({
       frame
     } = cameraConfig;
 
-
     //得到实时帧的特征点和描述子    
-    // currentFrame.data.set(frame.data); //摄像机图像的Mat格式
-
-    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化    
-
+    cv.cvtColor(currentFrame, currentGray, cv.COLOR_RGBA2GRAY); //灰度化
+    detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
 
     if (1) {
       detector.detect(currentGray, keyPoints); //得到特征点keyPoints    
+
       if (keyPoints.size() < 0.5 * feature_size) {
         console.log("info:keypoints is too few, return now..."); //特征点过少，返回
-        cv.imshow(currentFrame);
+        await that.showFrame();
+        console.log(`1:耗时${Date.now()-time}ms`);
+        // cv.imshow(currentFrame);
         return [{
           x,
           y,
@@ -685,7 +668,9 @@ Page({
       // 当goodMathc成功匹配数小于所设阈值时，提前结束
       if (tempImage_id == -1) {
         goodMatches.delete();
-        cv.imshow(currentFrame);
+        // cv.imshow(currentFrame);
+        await that.showFrame();
+        console.log(`2:耗时${Date.now()-time}ms`);
         return [{
           x,
           y,
@@ -753,9 +738,10 @@ Page({
 
             // let grayMatchingImage = new cv.Mat(2 * cameraConfig.frame.height, cameraConfig.frame.width, cv.CV_8UC4);
             // cv.drawMatches(currentFrame, keyPoints, templateImage.originalFrameArray[tempImage_id], originalKeyPointsArray[tempImage_id], inlierMatches, grayMatchingImage, new cv.Scalar(0, 255, 0), new cv.Scalar(0,0,255));
-            cv.imshow(currentFrame);
+            // cv.imshow(currentFrame);
+            await that.showFrame();
 
-            // console.log(`耗时${Date.now()-time}ms`);
+            console.log(`耗时${Date.now()-time}ms`);
           }
         }
       }
@@ -796,7 +782,7 @@ Page({
 
   },
 
-  tracking_KCF: function () {
+  tracking_KCF: async function () {
     let that = this;
     let {
       currentFrame,
@@ -826,20 +812,20 @@ Page({
     // console.log("更改模型位置耗时：", Date.now()-timeTemp);
 
     dev.ifRecognized = true; //跟踪到了模板图，更新性能测试指标    
-    draw_bounding_box(currentFrame, vertex, cv, "number");
+    // draw_bounding_box(currentFrame, vertex, cv, "number");
     console.log("此处1");
-    cv.line(mask, {
-      x: x + 0.5 * width,
-      y: y + 0.5 * height
-    }, {
-      x: oldCenter.x,
-      y: oldCenter.y
-    }, new cv.Scalar(255, 230, 0), 2);
-    console.log(cameraConfig.frame.width, "高：", cameraConfig.frame.height);
-    console.log(mask);
-    cv.add(currentFrame, mask, currentFrame);
+    // cv.line(mask, {
+    //   x: x + 0.5 * width,
+    //   y: y + 0.5 * height
+    // }, {
+    //   x: oldCenter.x,
+    //   y: oldCenter.y
+    // }, new cv.Scalar(255, 230, 0), 2);
+    // console.log(cameraConfig.frame.width, "高：", cameraConfig.frame.height);
+    // console.log(mask);
+    // cv.add(currentFrame, mask, currentFrame);
     console.log("此处3");
-    that.showFrame();
+    await that.showFrame();
 
     // cv.imshow(currentFrame);
     console.log("此处4");
@@ -847,6 +833,7 @@ Page({
     oldCenter.x = x + 0.5 * width;
     oldCenter.y = y + 0.5 * height;
     console.log("此处5");
+    console.log(`跟踪结果：${roi}`);
   },
 
   calculate_transform_new: function () {
@@ -1059,7 +1046,7 @@ Page({
 
 
 
-  webglInit() {
+  async webglInit() {
     let that = this;
     var query = wx.createSelectorQuery();
     query.select('#myCanvas')
@@ -1067,7 +1054,6 @@ Page({
       .exec(async (res) => {
         var webcanvas = res[0].node;
         const canvas = new THREE.global.registerCanvas(webcanvas);
-        console.log('THREE', THREE);
         ambient = new THREE.AmbientLight(0xF5F0F0);
         material = new THREE.MeshPhongMaterial({
           color: 0x920808,
@@ -1075,15 +1061,7 @@ Page({
           opacity: 0.6,
           transparent: true
         });
-        var k = that.data.widthScreen / that.data.heightScreen;
-        //var s = 176; //三维场景显示范围控制系数、
-        var s = that.data.heightScreen / 2;
-        camera = new THREE.OrthographicCamera(-s * k, s * k, s, -s, 1, 155);
-        var x = that.data.widthScreen / 2;
-        var y = -that.data.heightScreen / 2;
-        //使camera正对中心
-        camera.position.set(x, y, 150);
-        camera.lookAt(x, y, 0);
+
 
         renderer = new THREE.WebGLRenderer({
           // canvas: webcanvas,
@@ -1096,28 +1074,14 @@ Page({
           title: 'loading',
         });
         // fbxModelLoad(webcanvas, "https://weixin.wechatvr.org/animation/pig/fuzhu.fbx", THREE, that.data.width, that.data.height);
-        that.getwasm();
+        await that.getwasm();
       })
   },
-  setBackImage() {
-    let geometry = new THREE.PlaneGeometry(cameraConfig.frame.width, cameraConfig.frame.height); //矩形平面
-    let texture = new THREE.DataTexture(cameraConfig.frame.data, cameraConfig.frame.width, cameraConfig.frame.height, THREE.RGBAFormat);
-
-    //texture.needsUpdate = true; //纹理更新，作用存疑，似乎是正作用
-    let tex_material = new THREE.MeshPhongMaterial({
-      map: texture, // 设置纹理贴图
-      side: THREE.DoubleSide
-    });
-    geometry.translate(cameraConfig.frame.width / 2, cameraConfig.frame.height / 2, 0);
-    geometry.rotateX(Math.PI);
-    let mesh = new THREE.Mesh(geometry, tex_material);
-    scene.add(mesh);
-    renderer.render(scene, camera);
-  },
-
   /*显示实时帧画面*/
-  showFrame() {
-    let {frame} = cameraConfig;
+  async showFrame() {
+    let {
+      frame
+    } = cameraConfig;
     let geometry = new THREE.PlaneGeometry(frame.width, frame.height); //矩形平面
     let texture = new THREE.DataTexture(frame.data, frame.width, frame.height, THREE.RGBAFormat);
     texture.needsUpdate = true; //纹理更新，作用存疑，似乎是正作用
@@ -1129,13 +1093,12 @@ Page({
     geometry.rotateX(Math.PI);
     let mesh = new THREE.Mesh(geometry, tex_material);
     scene.add(mesh);
-    let starTime = Date.now();
     renderer.render(scene, camera);
     scene.remove(mesh);
     geometry.dispose();
     tex_material.dispose();
     texture.dispose();
-    console.log("显示耗时：", (Date.now() - starTime), "ms");
+    var a = await this.sleep(0)
   },
 
   /*图像帧尺寸自适应*/
